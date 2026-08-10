@@ -1,0 +1,4 @@
+node_modules/
+_chk.js
+_test.js
+*.local.json

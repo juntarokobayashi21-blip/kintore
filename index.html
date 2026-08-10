@@ -1,0 +1,1169 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1116">
+<title>筋トレ記録</title>
+<style>
+  :root{
+    --bg:#0e1116; --panel:#171c24; --panel2:#1f2630; --line:#2a323e;
+    --fg:#e8edf4; --muted:#8b97a8; --accent:#7dd3fc; --accent2:#a3e635;
+    --danger:#f87171; --radius:14px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--fg);
+    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
+    font-size:16px; line-height:1.5;
+    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+  }
+  input,select,button,textarea{font:inherit; color:inherit}
+  button{cursor:pointer}
+
+  header{
+    position:sticky; top:0; z-index:20; background:rgba(14,17,22,.92);
+    backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+    padding:10px 14px calc(10px + env(safe-area-inset-top)) 14px;
+    padding-top:calc(10px + env(safe-area-inset-top));
+    display:flex; align-items:center; gap:10px;
+  }
+  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.02em}
+  header .spacer{flex:1}
+
+  main{padding:14px; max-width:720px; margin:0 auto}
+  .view{display:none}
+  .view.active{display:block}
+
+  nav{
+    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    display:grid; grid-template-columns:repeat(4,1fr);
+    background:rgba(23,28,36,.96); backdrop-filter:blur(8px);
+    border-top:1px solid var(--line);
+    padding-bottom:env(safe-area-inset-bottom);
+  }
+  nav button{
+    background:none; border:0; color:var(--muted);
+    padding:10px 4px 12px; font-size:11px; display:flex;
+    flex-direction:column; align-items:center; gap:3px;
+  }
+  nav button .ic{font-size:19px; line-height:1}
+  nav button.active{color:var(--accent)}
+
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:12px}
+  .card h2{font-size:14px; margin:0 0 10px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+
+  .row{display:flex; align-items:center; gap:8px}
+  .btn{
+    background:var(--panel2); border:1px solid var(--line); color:var(--fg);
+    border-radius:10px; padding:10px 14px; font-size:14px; font-weight:600;
+  }
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--accent); border-color:var(--accent); color:#07121a}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:var(--danger); border-color:#4a2a2e}
+  .btn.block{width:100%; justify-content:center; display:flex}
+  .btn.lg{padding:14px; font-size:16px}
+  .btn.sm{padding:6px 10px; font-size:13px; border-radius:8px}
+
+  input[type=text],input[type=date],input[type=number],select,textarea{
+    background:var(--panel2); border:1px solid var(--line); color:var(--fg);
+    border-radius:10px; padding:10px 12px; width:100%; outline:none;
+  }
+  input:focus,select:focus{border-color:var(--accent)}
+  label.fld{display:block; font-size:12px; color:var(--muted); margin:0 0 4px}
+
+  /* --- 記録 --- */
+  .ex-block{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:12px; overflow:hidden}
+  .ex-head{display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line); background:var(--panel2)}
+  .ex-head .name{font-weight:700; font-size:15px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .ex-head .cat{font-size:11px; color:var(--muted); background:var(--bg); border-radius:999px; padding:2px 8px; white-space:nowrap}
+  .prev-line{font-size:12px; color:var(--muted); padding:8px 14px 0}
+  .sets{padding:8px 10px 12px}
+  .set-row{display:grid; grid-template-columns:26px 1fr 1fr 44px 34px; gap:6px; align-items:center; margin-bottom:6px}
+  .set-row .n{text-align:center; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
+  .set-row input{padding:12px 8px; text-align:center; font-size:16px; font-variant-numeric:tabular-nums}
+  .set-row input::placeholder{color:#4d5866}
+  .set-row .done{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:11px 0; font-size:16px; line-height:1}
+  .set-row.is-done input{border-color:#3d5a2e; background:#1b2418}
+  .set-row.is-done .done{background:var(--accent2); border-color:var(--accent2); color:#12200a}
+  .set-row .del{background:none; border:0; color:#5b6674; font-size:18px; padding:0}
+  .set-head{display:grid; grid-template-columns:26px 1fr 1fr 44px 34px; gap:6px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
+  .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
+
+  .empty{text-align:center; color:var(--muted); padding:30px 10px; font-size:14px}
+
+  /* --- 一覧・履歴 --- */
+  .list-item{display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--line)}
+  .list-item:last-child{border-bottom:0}
+  .list-item .t{flex:1; min-width:0}
+  .list-item .t b{display:block; font-size:15px; font-weight:600}
+  .list-item .t span{font-size:12px; color:var(--muted)}
+  .hist-detail{font-size:13px; color:var(--muted); padding:2px 0 10px 0; display:none}
+  .hist-detail.open{display:block}
+  .hist-detail div{padding:3px 0}
+
+  .stats-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+  .stat{background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 8px; text-align:center}
+  .stat b{display:block; font-size:20px; font-variant-numeric:tabular-nums}
+  .stat span{font-size:11px; color:var(--muted)}
+
+  svg.chart{width:100%; height:180px; display:block; overflow:visible}
+  svg .grid{stroke:var(--line); stroke-width:1}
+  svg .axis{fill:var(--muted); font-size:10px}
+  svg .ln{fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round}
+  svg .pt{fill:var(--accent)}
+  svg .bar{fill:var(--accent2); opacity:.85}
+
+  /* --- モーダル --- */
+  .modal{position:fixed; inset:0; z-index:50; display:none}
+  .modal.open{display:block}
+  .modal .backdrop{position:absolute; inset:0; background:rgba(0,0,0,.6)}
+  .modal .sheet{
+    position:absolute; left:0; right:0; bottom:0; max-height:86vh; overflow:auto;
+    background:var(--panel); border-radius:18px 18px 0 0; border-top:1px solid var(--line);
+    padding:16px 14px calc(16px + env(safe-area-inset-bottom));
+  }
+  .modal .sheet h3{margin:0 0 12px; font-size:16px}
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0}
+  .chip{background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:13px}
+  .chip.on{background:var(--accent); border-color:var(--accent); color:#07121a; font-weight:600}
+  .pick{display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line); font-size:15px}
+  .pick .cat{font-size:11px; color:var(--muted)}
+  .pick.sel{color:var(--accent2); font-weight:600}
+  .toast{
+    position:fixed; left:50%; transform:translateX(-50%); bottom:88px; z-index:60;
+    background:var(--panel2); border:1px solid var(--line); border-radius:999px;
+    padding:9px 18px; font-size:13px; opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="hdr">筋トレ記録</h1>
+  <div class="spacer"></div>
+  <button class="btn sm ghost" id="btnBackup">バックアップ</button>
+</header>
+
+<main>
+  <!-- ========== 記録 ========== -->
+  <section class="view active" id="v-log">
+    <div class="card">
+      <div class="row">
+        <div style="flex:1">
+          <label class="fld">日付</label>
+          <input type="date" id="logDate">
+        </div>
+        <div style="flex:1">
+          <label class="fld">ルーティン読込</label>
+          <select id="routinePick"><option value="">選択…</option></select>
+        </div>
+      </div>
+    </div>
+
+    <div id="logBody"></div>
+
+    <button class="btn primary block lg" id="btnAddEx">＋ 種目を追加</button>
+
+    <div class="card" style="margin-top:12px">
+      <h2>この日のサマリー</h2>
+      <div class="stats-grid">
+        <div class="stat"><b id="sToday">0</b><span>総ボリューム kg</span></div>
+        <div class="stat"><b id="sSets">0</b><span>完了セット</span></div>
+        <div class="stat"><b id="sEx">0</b><span>種目数</span></div>
+      </div>
+      <button class="btn block ghost sm" id="btnSaveRoutine" style="margin-top:10px">この構成をルーティンとして保存</button>
+    </div>
+  </section>
+
+  <!-- ========== 履歴 ========== -->
+  <section class="view" id="v-hist">
+    <div class="card">
+      <h2>トレーニング履歴</h2>
+      <div id="histBody"></div>
+    </div>
+  </section>
+
+  <!-- ========== 分析 ========== -->
+  <section class="view" id="v-stats">
+    <div class="card">
+      <h2>サマリー</h2>
+      <div class="stats-grid">
+        <div class="stat"><b id="kWeek">0</b><span>今週のボリューム</span></div>
+        <div class="stat"><b id="kSess">0</b><span>総セッション</span></div>
+        <div class="stat"><b id="kStreak">0</b><span>連続週</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>週別 総ボリューム (kg)</h2>
+      <div id="volChart"></div>
+    </div>
+
+    <div class="card">
+      <h2>種目別の推移</h2>
+      <select id="statEx"></select>
+      <div class="chips" style="margin-top:10px">
+        <button class="chip on" data-metric="e1rm">推定1RM</button>
+        <button class="chip" data-metric="top">最大重量</button>
+        <button class="chip" data-metric="vol">ボリューム</button>
+      </div>
+      <div id="exChart"></div>
+      <div id="exBest" style="font-size:13px;color:var(--muted);margin-top:8px"></div>
+    </div>
+  </section>
+
+  <!-- ========== 種目 ========== -->
+  <section class="view" id="v-ex">
+    <div class="card">
+      <h2>種目を追加</h2>
+      <div class="row">
+        <input type="text" id="newExName" placeholder="種目名">
+        <select id="newExCat" style="width:110px"></select>
+        <button class="btn primary" id="btnNewEx">追加</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>種目マスタ</h2>
+      <div id="exBody"></div>
+    </div>
+    <div class="card">
+      <h2>ルーティン</h2>
+      <div id="routineBody"></div>
+    </div>
+  </section>
+</main>
+
+<nav>
+  <button class="active" data-view="log"><span class="ic">🏋️</span>記録</button>
+  <button data-view="hist"><span class="ic">📅</span>履歴</button>
+  <button data-view="stats"><span class="ic">📈</span>分析</button>
+  <button data-view="ex"><span class="ic">⚙️</span>種目</button>
+</nav>
+
+<!-- 種目ピッカー -->
+<div class="modal" id="mPick">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3>種目を選ぶ</h3>
+    <input type="text" id="pickSearch" placeholder="検索…">
+    <div class="chips" id="pickCats"></div>
+    <div id="pickList"></div>
+    <button class="btn block ghost" data-close style="margin-top:12px">閉じる</button>
+  </div>
+</div>
+
+<!-- ルーティン編集 -->
+<div class="modal" id="mRoutine">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3 id="rtTitle">ルーティンを保存</h3>
+    <label class="fld">名前</label>
+    <input type="text" id="rtName" placeholder="例: 上半身プッシュ">
+    <div id="rtList" style="margin-top:12px"></div>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost" data-close style="flex:1">キャンセル</button>
+      <button class="btn primary" id="rtSave" style="flex:1">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 同期・バックアップ -->
+<div class="modal" id="mBackup">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3>GitHub同期 / バックアップ</h3>
+
+    <p style="font-size:13px;color:var(--muted);margin:0 0 10px">
+      記録を非公開 Gist に保存し、スマホとPCで同じデータを使えるようにします。
+      GitHub の <b>Settings → Developer settings → Personal access tokens (classic)</b> で
+      <b>gist</b> スコープだけを付けたトークンを作って貼ってください。
+    </p>
+    <p style="font-size:12px;color:var(--danger);margin:0 0 12px">
+      ⚠ トークンはこの端末のブラウザ内に平文で保存されます。共用端末では使わないでください。
+    </p>
+
+    <label class="fld">アクセストークン</label>
+    <input type="password" id="ghToken" placeholder="ghp_… / github_pat_…" autocomplete="off">
+    <label class="fld" style="margin-top:10px">Gist ID（空欄なら新規作成）</label>
+    <input type="text" id="ghGist" placeholder="初回同期時に自動で入ります">
+    <label style="display:flex;align-items:center;gap:8px;margin-top:12px;font-size:14px">
+      <input type="checkbox" id="ghAuto" style="width:auto"> 変更後に自動同期する
+    </label>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost" id="btnGhClear" style="flex:1">接続を解除</button>
+      <button class="btn primary" id="btnSyncNow" style="flex:2">今すぐ同期</button>
+    </div>
+    <div id="ghStatus" style="font-size:12px;color:var(--muted);margin-top:8px"></div>
+
+    <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+
+    <h3 style="font-size:14px">ローカルのバックアップ</h3>
+    <button class="btn primary block" id="btnExport">JSONを書き出す</button>
+    <label class="fld" style="margin-top:14px">JSONを読み込む（現在のデータを置き換え）</label>
+    <input type="file" id="fileImport" accept="application/json">
+    <button class="btn block ghost" data-close style="margin-top:14px">閉じる</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ============================================================
+   データ層
+============================================================ */
+const KEY = 'kintore.v1';
+const CATS = ['胸','背中','脚','肩','腕','体幹','有酸素','その他'];
+
+const DEFAULT_EX = [
+  ['ベンチプレス','胸'],['ダンベルプレス','胸'],['チェストプレス','胸'],
+  ['ダンベルフライ','胸'],['腕立て伏せ','胸'],
+  ['デッドリフト','背中'],['ラットプルダウン','背中'],['懸垂','背中'],
+  ['ベントオーバーロー','背中'],['シーテッドロー','背中'],
+  ['スクワット','脚'],['レッグプレス','脚'],['レッグエクステンション','脚'],
+  ['レッグカール','脚'],['ブルガリアンスクワット','脚'],['カーフレイズ','脚'],
+  ['ショルダープレス','肩'],['サイドレイズ','肩'],['リアレイズ','肩'],
+  ['アップライトロー','肩'],
+  ['アームカール','腕'],['ハンマーカール','腕'],['トライセプスプレスダウン','腕'],
+  ['スカルクラッシャー','腕'],
+  ['アブローラー','体幹'],['プランク','体幹'],['レッグレイズ','体幹'],
+  ['ランニング','有酸素'],['エアロバイク','有酸素'],
+];
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+const nowISO = () => new Date().toISOString();
+
+// 種目・ルーティンの id は「名前」そのもの。端末をまたいでも一致するので同期時にマージできる。
+function seed() {
+  return {
+    v: 2,
+    exercises: DEFAULT_EX.map(([name, cat]) => ({ id: name, name, cat, u: '' })),
+    routines: [],   // {id:name, name, exIds, u}
+    sessions: [],   // {id, date:'YYYY-MM-DD', u, entries:[{exId, sets:[{w,r,done}]}]}
+    tomb: { s: {}, e: {}, r: {} },   // 削除の墓標: {キー: 削除時刻ISO}
+    updatedAt: '',
+  };
+}
+
+let db;
+try {
+  db = JSON.parse(localStorage.getItem(KEY)) || seed();
+} catch (e) {
+  db = seed();
+}
+db = normalize(db);
+
+// v1（ランダムid）→ v2（名前id）への移行と、欠損フィールドの補完
+function normalize(d) {
+  const s = seed();
+  for (const k of ['exercises', 'routines', 'sessions']) if (!Array.isArray(d[k])) d[k] = s[k];
+  if (!d.tomb || typeof d.tomb !== 'object') d.tomb = { s: {}, e: {}, r: {} };
+  for (const k of ['s', 'e', 'r']) if (!d.tomb[k] || typeof d.tomb[k] !== 'object') d.tomb[k] = {};
+  if (typeof d.updatedAt !== 'string') d.updatedAt = '';
+
+  if (d.v !== 2) {
+    const exMap = {};                       // 旧id -> 名前
+    for (const e of d.exercises) { exMap[e.id] = e.name; e.id = e.name; }
+    const rtMap = {};
+    for (const r of d.routines) { rtMap[r.id] = r.name; r.id = r.name; r.exIds = (r.exIds || []).map(id => exMap[id] || id); }
+    for (const ss of d.sessions) for (const en of ss.entries || []) en.exId = exMap[en.exId] || en.exId;
+    d.v = 2;
+  }
+  for (const e of d.exercises) if (!e.u) e.u = '';
+  for (const r of d.routines) if (!r.u) r.u = '';
+  for (const ss of d.sessions) { if (!ss.id) ss.id = uid(); if (!ss.u) ss.u = ''; if (!Array.isArray(ss.entries)) ss.entries = []; }
+  return d;
+}
+
+let saveTimer = null;
+function save() {
+  db.updatedAt = nowISO();
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(KEY, JSON.stringify(db)); }
+    catch (e) { toast('保存に失敗しました（容量超過？）'); }
+    scheduleSync();
+  }, 120);
+}
+// その日のセッションに更新時刻を刻んでから保存（同期時の新旧判定に使う）
+function saveDay() {
+  const s = db.sessions.find(x => x.date === curDate);
+  if (s) s.u = nowISO();
+  save();
+}
+
+const exById = id => db.exercises.find(e => e.id === id);
+const exName = id => (exById(id) || {}).name || '(削除された種目)';
+
+/* ============================================================
+   計算ユーティリティ
+============================================================ */
+const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+// Epley 式。10回以下で概ね妥当、それ以上は過大評価になる点に注意。
+const e1rm = (w, r) => (w > 0 && r > 0) ? w * (1 + r / 30) : 0;
+const setVol = s => num(s.w) * num(s.r);
+
+function sessionVolume(sess) {
+  let v = 0;
+  for (const en of sess.entries) for (const s of en.sets) if (s.done) v += setVol(s);
+  return v;
+}
+function doneSets(sess) {
+  let n = 0;
+  for (const en of sess.entries) n += en.sets.filter(s => s.done).length;
+  return n;
+}
+const fmt = n => Math.round(n).toLocaleString('ja-JP');
+const today = () => {
+  const d = new Date(), p = x => String(x).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+};
+// ISO 週の月曜日を返す
+function weekStart(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  const off = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - off);
+  const p = x => String(x).padStart(2, '0');
+  return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+}
+const mdLabel = ds => ds.slice(5).replace('-', '/');
+
+/* ============================================================
+   セッション取得
+============================================================ */
+let curDate = today();
+
+function getSession(date, create) {
+  let s = db.sessions.find(x => x.date === date);
+  if (!s && create) {
+    s = { id: uid(), date, u: nowISO(), entries: [] };
+    db.sessions.push(s);
+    delete db.tomb.s[date];
+  }
+  return s;
+}
+function dropSession(date) {
+  db.sessions = db.sessions.filter(x => x.date !== date);
+  db.tomb.s[date] = nowISO();
+}
+const sortedSessions = () => db.sessions.slice().sort((a, b) => b.date < a.date ? -1 : 1);
+
+// その日より前で、その種目を最後にやったセッションの完了セット
+function prevSets(exId, beforeDate) {
+  const cands = db.sessions
+    .filter(s => s.date < beforeDate)
+    .sort((a, b) => a.date < b.date ? 1 : -1);
+  for (const s of cands) {
+    const en = s.entries.find(e => e.exId === exId);
+    if (en) {
+      const done = en.sets.filter(x => x.done && (num(x.w) > 0 || num(x.r) > 0));
+      if (done.length) return { date: s.date, sets: done };
+    }
+  }
+  return null;
+}
+
+/* ============================================================
+   共通 UI
+============================================================ */
+const $ = s => document.querySelector(s);
+const $$ = s => Array.from(document.querySelectorAll(s));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+const openModal = id => $(id).classList.add('open');
+const closeModal = id => $(id).classList.remove('open');
+document.addEventListener('click', e => {
+  if (e.target.hasAttribute && e.target.hasAttribute('data-close')) {
+    e.target.closest('.modal').classList.remove('open');
+  }
+});
+
+$$('nav button').forEach(b => b.addEventListener('click', () => {
+  $$('nav button').forEach(x => x.classList.toggle('active', x === b));
+  const v = b.dataset.view;
+  $$('.view').forEach(s => s.classList.toggle('active', s.id === 'v-' + v));
+  $('#hdr').textContent = { log: '筋トレ記録', hist: '履歴', stats: '分析', ex: '種目・ルーティン' }[v];
+  if (v === 'hist') renderHist();
+  if (v === 'stats') renderStats();
+  if (v === 'ex') renderExMaster();
+  window.scrollTo(0, 0);
+}));
+
+/* ============================================================
+   記録ビュー
+============================================================ */
+function renderLog() {
+  $('#logDate').value = curDate;
+  const sess = getSession(curDate, false);
+  const body = $('#logBody');
+
+  if (!sess || !sess.entries.length) {
+    body.innerHTML = '<div class="card"><div class="empty">まだ種目がありません。<br>下のボタンから追加してください。</div></div>';
+  } else {
+    body.innerHTML = sess.entries.map((en, ei) => {
+      const ex = exById(en.exId) || { name: exName(en.exId), cat: '' };
+      const prev = prevSets(en.exId, curDate);
+      const prevTxt = prev
+        ? '前回 ' + mdLabel(prev.date) + '：' + prev.sets.map(s => num(s.w) + 'kg×' + num(s.r)).join(' / ')
+        : '前回の記録なし';
+
+      const rows = en.sets.map((s, si) => {
+        const ph = prev && prev.sets[si] ? prev.sets[si] : (prev ? prev.sets[prev.sets.length - 1] : null);
+        return '<div class="set-row' + (s.done ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
+          '<div class="n">' + (si + 1) + '</div>' +
+          '<input type="number" inputmode="decimal" step="0.5" class="in-w" value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
+          '<input type="number" inputmode="numeric" step="1" class="in-r" value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
+          '<button class="done" data-act="done">' + (s.done ? '✓' : '○') + '</button>' +
+          '<button class="del" data-act="delset">×</button>' +
+        '</div>';
+      }).join('');
+
+      return '<div class="ex-block">' +
+        '<div class="ex-head">' +
+          '<div class="name">' + esc(ex.name) + '</div>' +
+          (ex.cat ? '<div class="cat">' + esc(ex.cat) + '</div>' : '') +
+          '<button class="btn sm ghost" data-act="delex" data-e="' + ei + '">削除</button>' +
+        '</div>' +
+        '<div class="prev-line">' + esc(prevTxt) + '</div>' +
+        '<div class="sets">' +
+          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>完了</div><div></div></div>' +
+          rows +
+        '</div>' +
+        '<div class="ex-foot">' +
+          '<button class="btn sm" data-act="addset" data-e="' + ei + '" style="flex:1">＋ セット</button>' +
+          (prev ? '<button class="btn sm" data-act="copyprev" data-e="' + ei + '" style="flex:1">前回をコピー</button>' : '') +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+  renderDaySummary();
+}
+
+function renderDaySummary() {
+  const sess = getSession(curDate, false);
+  $('#sToday').textContent = sess ? fmt(sessionVolume(sess)) : '0';
+  $('#sSets').textContent = sess ? doneSets(sess) : 0;
+  $('#sEx').textContent = sess ? sess.entries.length : 0;
+}
+
+// 入力（値の変更）
+$('#logBody').addEventListener('input', e => {
+  const row = e.target.closest('.set-row'); if (!row) return;
+  const sess = getSession(curDate, true);
+  const s = sess.entries[+row.dataset.e].sets[+row.dataset.s];
+  if (e.target.classList.contains('in-w')) s.w = e.target.value;
+  if (e.target.classList.contains('in-r')) s.r = e.target.value;
+  saveDay(); renderDaySummary();
+});
+
+// ボタン操作
+$('#logBody').addEventListener('click', e => {
+  const btn = e.target.closest('[data-act]'); if (!btn) return;
+  const act = btn.dataset.act;
+  const sess = getSession(curDate, true);
+
+  if (act === 'done') {
+    const row = btn.closest('.set-row');
+    const en = sess.entries[+row.dataset.e];
+    const s = en.sets[+row.dataset.s];
+    // 未入力のままチェックしたら前回値／直前セットを引き継ぐ
+    if (!s.done) {
+      if (s.w === '' || s.w == null) {
+        const ph = row.querySelector('.in-w').placeholder;
+        if (ph && ph !== 'kg') s.w = ph;
+      }
+      if (s.r === '' || s.r == null) {
+        const ph = row.querySelector('.in-r').placeholder;
+        if (ph && ph !== '回') s.r = ph;
+      }
+    }
+    s.done = !s.done;
+    saveDay(); renderLog(); return;
+  }
+  if (act === 'delset') {
+    const row = btn.closest('.set-row');
+    const en = sess.entries[+row.dataset.e];
+    en.sets.splice(+row.dataset.s, 1);
+    if (!en.sets.length) en.sets.push({ w: '', r: '', done: false });
+    saveDay(); renderLog(); return;
+  }
+  if (act === 'addset') {
+    const en = sess.entries[+btn.dataset.e];
+    const last = en.sets[en.sets.length - 1];
+    en.sets.push({ w: last ? last.w : '', r: last ? last.r : '', done: false });
+    saveDay(); renderLog(); return;
+  }
+  if (act === 'copyprev') {
+    const en = sess.entries[+btn.dataset.e];
+    const prev = prevSets(en.exId, curDate);
+    if (prev) {
+      en.sets = prev.sets.map(s => ({ w: String(num(s.w)), r: String(num(s.r)), done: false }));
+      saveDay(); renderLog();
+    }
+    return;
+  }
+  if (act === 'delex') {
+    const en = sess.entries[+btn.dataset.e];
+    if (confirm(exName(en.exId) + ' をこの日から削除しますか？')) {
+      sess.entries.splice(+btn.dataset.e, 1);
+      if (!sess.entries.length) dropSession(sess.date);
+      saveDay(); renderLog();
+    }
+  }
+});
+
+$('#logDate').addEventListener('change', e => {
+  curDate = e.target.value || today();
+  renderLog();
+});
+
+/* ---- 種目ピッカー ---- */
+let pickCat = '';
+function renderPick() {
+  const q = $('#pickSearch').value.trim().toLowerCase();
+  $('#pickCats').innerHTML = ['すべて'].concat(CATS).map(c => {
+    const val = c === 'すべて' ? '' : c;
+    return '<button class="chip' + (pickCat === val ? ' on' : '') + '" data-cat="' + esc(val) + '">' + esc(c) + '</button>';
+  }).join('');
+
+  const list = db.exercises.filter(e =>
+    (!pickCat || e.cat === pickCat) && (!q || e.name.toLowerCase().includes(q))
+  );
+  $('#pickList').innerHTML = list.length
+    ? list.map(e => '<div class="pick" data-id="' + esc(e.id) + '"><div style="flex:1">' + esc(e.name) + '</div><div class="cat">' + esc(e.cat) + '</div></div>').join('')
+    : '<div class="empty">該当なし。「種目」タブから追加できます。</div>';
+}
+$('#btnAddEx').addEventListener('click', () => {
+  $('#pickSearch').value = ''; pickCat = '';
+  renderPick(); openModal('#mPick');
+});
+$('#pickSearch').addEventListener('input', renderPick);
+$('#pickCats').addEventListener('click', e => {
+  const c = e.target.closest('[data-cat]'); if (!c) return;
+  pickCat = c.dataset.cat; renderPick();
+});
+$('#pickList').addEventListener('click', e => {
+  const it = e.target.closest('[data-id]'); if (!it) return;
+  addExerciseToDay(it.dataset.id);
+  closeModal('#mPick');
+});
+
+function addExerciseToDay(exId) {
+  const sess = getSession(curDate, true);
+  if (sess.entries.some(en => en.exId === exId)) { toast('すでに追加済みです'); return; }
+  const prev = prevSets(exId, curDate);
+  const n = prev ? prev.sets.length : 3;
+  sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '', done: false })) });
+  saveDay(); renderLog();
+}
+
+/* ---- ルーティン ---- */
+function renderRoutinePick() {
+  $('#routinePick').innerHTML = '<option value="">選択…</option>' +
+    db.routines.map(r => '<option value="' + esc(r.id) + '">' + esc(r.name) + '</option>').join('');
+}
+$('#routinePick').addEventListener('change', e => {
+  const r = db.routines.find(x => x.id === e.target.value);
+  e.target.value = '';
+  if (!r) return;
+  const sess = getSession(curDate, true);
+  let added = 0;
+  for (const exId of r.exIds) {
+    if (!exById(exId)) continue;
+    if (sess.entries.some(en => en.exId === exId)) continue;
+    const prev = prevSets(exId, curDate);
+    const n = prev ? prev.sets.length : 3;
+    sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '', done: false })) });
+    added++;
+  }
+  if (!sess.entries.length) dropSession(sess.date);
+  saveDay(); renderLog();
+  toast(added ? r.name + ' を読み込みました' : '追加する種目がありませんでした');
+});
+
+let rtEditing = null;
+$('#btnSaveRoutine').addEventListener('click', () => {
+  const sess = getSession(curDate, false);
+  if (!sess || !sess.entries.length) { toast('先に種目を追加してください'); return; }
+  rtEditing = { id: null, name: '', exIds: sess.entries.map(en => en.exId) };
+  openRoutineEditor();
+});
+function openRoutineEditor() {
+  $('#rtTitle').textContent = rtEditing.id ? 'ルーティンを編集' : 'ルーティンを保存';
+  $('#rtName').value = rtEditing.name;
+  $('#rtList').innerHTML = '<label class="fld">含まれる種目</label>' +
+    rtEditing.exIds.map(id => '<div class="pick">' + esc(exName(id)) + '</div>').join('');
+  openModal('#mRoutine');
+}
+$('#rtSave').addEventListener('click', () => {
+  const name = $('#rtName').value.trim();
+  if (!name) { toast('名前を入力してください'); return; }
+  const exist = db.routines.find(x => x.id === name);
+  if (exist) {
+    if (!confirm('同名のルーティンを上書きしますか？')) return;
+    exist.exIds = rtEditing.exIds; exist.u = nowISO();
+  } else {
+    db.routines.push({ id: name, name, exIds: rtEditing.exIds, u: nowISO() });
+    delete db.tomb.r[name];
+  }
+  save(); renderRoutinePick(); renderExMaster();
+  closeModal('#mRoutine'); toast('保存しました');
+});
+
+/* ============================================================
+   履歴ビュー
+============================================================ */
+function renderHist() {
+  const ss = sortedSessions();
+  if (!ss.length) { $('#histBody').innerHTML = '<div class="empty">記録がありません。</div>'; return; }
+  $('#histBody').innerHTML = ss.map(s => {
+    const detail = s.entries.map(en => {
+      const done = en.sets.filter(x => x.done);
+      const txt = done.length ? done.map(x => num(x.w) + '×' + num(x.r)).join(' / ') : '未完了';
+      return '<div>・' + esc(exName(en.exId)) + '　' + esc(txt) + '</div>';
+    }).join('');
+    return '<div>' +
+      '<div class="list-item" data-id="' + s.id + '">' +
+        '<div class="t"><b>' + s.date + '</b><span>' + s.entries.length + '種目 / ' + doneSets(s) + 'セット / ' + fmt(sessionVolume(s)) + ' kg</span></div>' +
+        '<button class="btn sm ghost" data-act="open">' + s.date + 'を編集</button>' +
+        '<button class="btn sm danger" data-act="del">削除</button>' +
+      '</div>' +
+      '<div class="hist-detail" id="hd-' + s.id + '">' + detail + '</div>' +
+    '</div>';
+  }).join('');
+}
+$('#histBody').addEventListener('click', e => {
+  const item = e.target.closest('.list-item'); if (!item) return;
+  const id = item.dataset.id;
+  const sess = db.sessions.find(x => x.id === id);
+  const act = (e.target.closest('[data-act]') || {}).dataset;
+
+  if (act && act.act === 'del') {
+    if (confirm(sess.date + ' の記録を削除しますか？')) {
+      dropSession(sess.date);
+      save(); renderHist(); renderLog();
+    }
+    return;
+  }
+  if (act && act.act === 'open') {
+    curDate = sess.date; renderLog();
+    $$('nav button')[0].click();
+    return;
+  }
+  $('#hd-' + id).classList.toggle('open');
+});
+
+/* ============================================================
+   分析ビュー
+============================================================ */
+function renderStats() {
+  const ss = sortedSessions();
+  // 週別ボリューム
+  const byWeek = new Map();
+  for (const s of ss) {
+    const w = weekStart(s.date);
+    byWeek.set(w, (byWeek.get(w) || 0) + sessionVolume(s));
+  }
+  const weeks = Array.from(byWeek.keys()).sort();
+  const thisWeek = weekStart(today());
+  $('#kWeek').textContent = fmt(byWeek.get(thisWeek) || 0);
+  $('#kSess').textContent = ss.length;
+
+  // 連続週（今週 or 先週から遡る）
+  let streak = 0;
+  const step = ds => {
+    const d = new Date(ds + 'T00:00:00'); d.setDate(d.getDate() - 7);
+    const p = x => String(x).padStart(2, '0');
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  };
+  let cur = byWeek.has(thisWeek) ? thisWeek : step(thisWeek);
+  while (byWeek.has(cur) && byWeek.get(cur) > 0) { streak++; cur = step(cur); }
+  $('#kStreak').textContent = streak;
+
+  $('#volChart').innerHTML = weeks.length
+    ? barChart(weeks.slice(-12).map(w => ({ label: mdLabel(w), v: byWeek.get(w) })))
+    : '<div class="empty">データがありません。</div>';
+
+  // 種目セレクト（記録のある種目のみ）
+  const used = [];
+  for (const s of ss) for (const en of s.entries) if (!used.includes(en.exId) && en.sets.some(x => x.done)) used.push(en.exId);
+  const sel = $('#statEx');
+  const keep = sel.value;
+  sel.innerHTML = used.length
+    ? used.map(id => '<option value="' + esc(id) + '">' + esc(exName(id)) + '</option>').join('')
+    : '<option value="">記録なし</option>';
+  if (used.includes(keep)) sel.value = keep;
+  renderExChart();
+}
+
+let metric = 'e1rm';
+$$('#v-stats .chip').forEach(c => c.addEventListener('click', () => {
+  $$('#v-stats .chip').forEach(x => x.classList.toggle('on', x === c));
+  metric = c.dataset.metric;
+  renderExChart();
+}));
+$('#statEx').addEventListener('change', renderExChart);
+
+function renderExChart() {
+  const exId = $('#statEx').value;
+  const box = $('#exChart'), best = $('#exBest');
+  if (!exId) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
+
+  const pts = [];
+  for (const s of db.sessions.slice().sort((a, b) => a.date < b.date ? -1 : 1)) {
+    const en = s.entries.find(e => e.exId === exId); if (!en) continue;
+    const done = en.sets.filter(x => x.done && num(x.w) > 0 && num(x.r) > 0);
+    if (!done.length) continue;
+    const v = metric === 'vol' ? done.reduce((a, x) => a + setVol(x), 0)
+            : metric === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
+            : Math.max.apply(null, done.map(x => e1rm(num(x.w), num(x.r))));
+    pts.push({ label: mdLabel(s.date), v });
+  }
+  if (pts.length < 1) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
+
+  box.innerHTML = pts.length === 1 ? barChart(pts) : lineChart(pts.slice(-20));
+
+  const max = Math.max.apply(null, pts.map(p => p.v));
+  const unit = metric === 'vol' ? 'kg（総量）' : 'kg';
+  const name = metric === 'vol' ? '最高ボリューム' : metric === 'top' ? '最大重量' : '推定1RM 最高';
+  best.textContent = name + '：' + (Math.round(max * 10) / 10) + ' ' + unit +
+    (metric === 'e1rm' ? '（Epley式・10回以下で概ね妥当）' : '');
+}
+
+/* ---- SVG チャート（依存ライブラリなし） ---- */
+function scaleY(vals) {
+  const max = Math.max.apply(null, vals.concat([1]));
+  const nice = Math.pow(10, Math.floor(Math.log10(max)));
+  const top = Math.ceil(max / nice * 4) / 4 * nice;
+  return { top: top || 1 };
+}
+function lineChart(pts) {
+  const W = 320, H = 160, PL = 38, PR = 8, PT = 10, PB = 22;
+  const { top } = scaleY(pts.map(p => p.v));
+  const x = i => PL + (W - PL - PR) * (pts.length === 1 ? .5 : i / (pts.length - 1));
+  const y = v => PT + (H - PT - PB) * (1 - v / top);
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const gy = PT + (H - PT - PB) * i / 4;
+    g += '<line class="grid" x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '"/>' +
+         '<text class="axis" x="' + (PL - 5) + '" y="' + (gy + 3) + '" text-anchor="end">' + fmt(top * (1 - i / 4)) + '</text>';
+  }
+  const d = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  const dots = pts.map((p, i) => '<circle class="pt" cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="3"/>').join('');
+  const step = Math.ceil(pts.length / 6);
+  const lbl = pts.map((p, i) => (i % step === 0 || i === pts.length - 1)
+    ? '<text class="axis" x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + p.label + '</text>' : '').join('');
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + g + '<path class="ln" d="' + d + '"/>' + dots + lbl + '</svg>';
+}
+function barChart(pts) {
+  const W = 320, H = 160, PL = 38, PR = 8, PT = 10, PB = 22;
+  const { top } = scaleY(pts.map(p => p.v));
+  const iw = (W - PL - PR) / pts.length;
+  const bw = Math.max(4, iw * 0.6);
+  let g = '';
+  for (let i = 0; i <= 4; i++) {
+    const gy = PT + (H - PT - PB) * i / 4;
+    g += '<line class="grid" x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '"/>' +
+         '<text class="axis" x="' + (PL - 5) + '" y="' + (gy + 3) + '" text-anchor="end">' + fmt(top * (1 - i / 4)) + '</text>';
+  }
+  const bars = pts.map((p, i) => {
+    const cx = PL + iw * (i + .5);
+    const h = (H - PT - PB) * (p.v / top);
+    return '<rect class="bar" x="' + (cx - bw / 2).toFixed(1) + '" y="' + (H - PB - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" rx="2"/>';
+  }).join('');
+  const step = Math.ceil(pts.length / 6);
+  const lbl = pts.map((p, i) => (i % step === 0 || i === pts.length - 1)
+    ? '<text class="axis" x="' + (PL + iw * (i + .5)).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + p.label + '</text>' : '').join('');
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + g + bars + lbl + '</svg>';
+}
+
+/* ============================================================
+   種目マスタ / ルーティン管理
+============================================================ */
+$('#newExCat').innerHTML = CATS.map(c => '<option>' + c + '</option>').join('');
+
+function renderExMaster() {
+  const groups = CATS.filter(c => db.exercises.some(e => e.cat === c));
+  $('#exBody').innerHTML = groups.map(c =>
+    '<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--muted);margin:8px 0 2px">' + esc(c) + '</div>' +
+    db.exercises.filter(e => e.cat === c).map(e =>
+      '<div class="list-item"><div class="t"><b>' + esc(e.name) + '</b></div>' +
+      '<button class="btn sm danger" data-delex="' + esc(e.id) + '">削除</button></div>').join('') +
+    '</div>').join('') || '<div class="empty">種目がありません。</div>';
+
+  $('#routineBody').innerHTML = db.routines.length
+    ? db.routines.map(r =>
+      '<div class="list-item"><div class="t"><b>' + esc(r.name) + '</b><span>' +
+      esc(r.exIds.map(exName).join('、')) + '</span></div>' +
+      '<button class="btn sm danger" data-delrt="' + esc(r.id) + '">削除</button></div>').join('')
+    : '<div class="empty">記録タブで構成を作り、「ルーティンとして保存」から作成できます。</div>';
+}
+
+$('#btnNewEx').addEventListener('click', () => {
+  const name = $('#newExName').value.trim();
+  if (!name) { toast('種目名を入力してください'); return; }
+  if (db.exercises.some(e => e.name === name)) { toast('同名の種目があります'); return; }
+  db.exercises.push({ id: name, name, cat: $('#newExCat').value, u: nowISO() });
+  delete db.tomb.e[name];
+  $('#newExName').value = '';
+  save(); renderExMaster(); toast('追加しました');
+});
+
+$('#v-ex').addEventListener('click', e => {
+  const dx = e.target.closest('[data-delex]');
+  if (dx) {
+    const id = dx.dataset.delex;
+    const used = db.sessions.some(s => s.entries.some(en => en.exId === id));
+    const msg = used
+      ? exName(id) + ' には記録があります。種目マスタから削除しますか？（過去の記録は残ります）'
+      : exName(id) + ' を削除しますか？';
+    if (confirm(msg)) {
+      db.exercises = db.exercises.filter(x => x.id !== id);
+      db.tomb.e[id] = nowISO();
+      db.routines.forEach(r => { if (r.exIds.includes(id)) { r.exIds = r.exIds.filter(x => x !== id); r.u = nowISO(); } });
+      save(); renderExMaster(); renderRoutinePick();
+    }
+    return;
+  }
+  const dr = e.target.closest('[data-delrt]');
+  if (dr) {
+    const r = db.routines.find(x => x.id === dr.dataset.delrt);
+    if (confirm(r.name + ' を削除しますか？')) {
+      db.routines = db.routines.filter(x => x.id !== r.id);
+      db.tomb.r[r.id] = nowISO();
+      save(); renderExMaster(); renderRoutinePick();
+    }
+  }
+});
+
+/* ============================================================
+   バックアップ
+============================================================ */
+$('#btnBackup').addEventListener('click', () => openModal('#mBackup'));
+$('#btnExport').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'kintore-' + today() + '.json';
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+});
+$('#fileImport').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return;
+  const rd = new FileReader();
+  rd.onload = () => {
+    try {
+      const d = JSON.parse(rd.result);
+      if (!Array.isArray(d.exercises) || !Array.isArray(d.sessions)) throw new Error('形式が不正');
+      if (!confirm('現在のデータを置き換えます。よろしいですか？')) return;
+      db = normalize(d);
+      localStorage.setItem(KEY, JSON.stringify(db));
+      renderRoutinePick(); renderLog(); renderExMaster();
+      closeModal('#mBackup'); toast('読み込みました');
+    } catch (err) { toast('読み込み失敗: ' + err.message); }
+    e.target.value = '';
+  };
+  rd.readAsText(f);
+});
+
+/* ============================================================
+   GitHub Gist 同期
+   ------------------------------------------------------------
+   競合解決は「最終更新が新しい方を採る」方式。
+   - 種目 / ルーティン: id（＝名前）ごとに u が新しい方
+   - セッション: 日付ごとに u が新しい方（日単位でまるごと採用）
+   - 削除は tomb（墓標）に時刻を記録し、対象の u より新しければ削除を優先
+   同じ日を2台で同時に編集した場合は、後から保存した側だけが残ります。
+============================================================ */
+const GKEY = 'kintore.gh';
+const GFILE = 'kintore.json';
+
+let gh;
+try { gh = JSON.parse(localStorage.getItem(GKEY)) || {}; } catch (e) { gh = {}; }
+gh.token = gh.token || ''; gh.gistId = gh.gistId || '';
+if (typeof gh.auto !== 'boolean') gh.auto = true;
+const saveGh = () => localStorage.setItem(GKEY, JSON.stringify(gh));
+
+async function ghApi(path, opt) {
+  opt = opt || {};
+  const res = await fetch('https://api.github.com' + path, {
+    method: opt.method || 'GET',
+    body: opt.body,
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'Authorization': 'Bearer ' + gh.token,
+      'X-GitHub-Api-Version': '2022-11-28',
+    },
+  });
+  if (!res.ok) {
+    let msg = res.status + ' ' + res.statusText;
+    if (res.status === 401) msg = 'トークンが無効です (401)';
+    if (res.status === 403) msg = '権限不足です。gist スコープを確認してください (403)';
+    if (res.status === 404) msg = 'Gist が見つかりません (404)';
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+function mergeTomb(x, y) {
+  const o = Object.assign({}, x || {});
+  for (const k in (y || {})) if (!o[k] || y[k] > o[k]) o[k] = y[k];
+  return o;
+}
+function mergeById(a, b, tomb, keyOf) {
+  const m = new Map();
+  for (const src of [a, b]) for (const it of src) {
+    const cur = m.get(it.id);
+    if (!cur || (it.u || '') > (cur.u || '')) m.set(it.id, it);
+  }
+  return Array.from(m.values()).filter(it => {
+    const t = tomb[keyOf ? keyOf(it) : it.id];
+    return !(t && t > (it.u || ''));
+  });
+}
+function mergeDb(a, b) {
+  const out = seed();
+  out.tomb = {
+    s: mergeTomb(a.tomb.s, b.tomb.s),
+    e: mergeTomb(a.tomb.e, b.tomb.e),
+    r: mergeTomb(a.tomb.r, b.tomb.r),
+  };
+  out.exercises = mergeById(a.exercises, b.exercises, out.tomb.e);
+  out.routines  = mergeById(a.routines,  b.routines,  out.tomb.r);
+  out.sessions  = mergeById(
+    a.sessions.map(s => ({ ...s, id: s.date })),
+    b.sessions.map(s => ({ ...s, id: s.date })),
+    out.tomb.s
+  );
+  out.updatedAt = (a.updatedAt || '') > (b.updatedAt || '') ? a.updatedAt : b.updatedAt;
+  return out;
+}
+// updatedAt を除いた実データの指紋（マージで中身が変わったかの判定用）
+const fingerprint = d => JSON.stringify([d.exercises, d.routines, d.sessions, d.tomb]);
+
+function setSyncStatus(txt) {
+  const el = $('#ghStatus'); if (el) el.textContent = txt;
+  $('#btnBackup').textContent = gh.token ? '☁ ' + (txt || '同期') : 'バックアップ';
+}
+
+function rerenderAll() {
+  renderRoutinePick();
+  // 入力中は記録画面を作り直さない（フォーカスと未確定入力が飛ぶため）
+  const ae = document.activeElement;
+  if (!(ae && ae.tagName === 'INPUT' && ae.closest('#logBody'))) renderLog();
+  if ($('#v-hist').classList.contains('active')) renderHist();
+  if ($('#v-stats').classList.contains('active')) renderStats();
+  if ($('#v-ex').classList.contains('active')) renderExMaster();
+}
+
+let syncing = false, syncTimer = null;
+function scheduleSync() {
+  if (!gh.token || !gh.auto) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => syncNow(true), 8000);
+}
+
+async function syncNow(silent) {
+  if (!gh.token) { if (!silent) toast('トークンを設定してください'); return; }
+  if (syncing) return;
+  syncing = true;
+  clearTimeout(syncTimer);
+  setSyncStatus('同期中…');
+  try {
+    let remote = null;
+    if (gh.gistId) {
+      const g = await ghApi('/gists/' + encodeURIComponent(gh.gistId));
+      const f = g.files && g.files[GFILE];
+      if (f) {
+        let content = f.content;
+        if (f.truncated && f.raw_url) content = await (await fetch(f.raw_url)).text();
+        remote = normalize(JSON.parse(content));
+      }
+    }
+
+    if (remote) {
+      const merged = mergeDb(db, remote);
+      if (fingerprint(merged) !== fingerprint(db)) {
+        db = merged;
+        localStorage.setItem(KEY, JSON.stringify(db));
+        rerenderAll();
+      }
+    }
+
+    const payload = JSON.stringify(db, null, 1);
+    if (gh.gistId) {
+      await ghApi('/gists/' + encodeURIComponent(gh.gistId), {
+        method: 'PATCH',
+        body: JSON.stringify({ files: { [GFILE]: { content: payload } } }),
+      });
+    } else {
+      const g = await ghApi('/gists', {
+        method: 'POST',
+        body: JSON.stringify({
+          description: '筋トレ記録データ (kintore)',
+          public: false,
+          files: { [GFILE]: { content: payload } },
+        }),
+      });
+      gh.gistId = g.id; saveGh();
+      $('#ghGist').value = g.id;
+    }
+
+    gh.lastSync = nowISO(); saveGh();
+    setSyncStatus(new Date().toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + ' 同期済');
+    if (!silent) toast('同期しました');
+  } catch (err) {
+    setSyncStatus('エラー: ' + err.message);
+    if (!silent) toast('同期失敗: ' + err.message);
+  } finally {
+    syncing = false;
+  }
+}
+
+$('#btnSyncNow').addEventListener('click', () => {
+  gh.token = $('#ghToken').value.trim();
+  gh.gistId = $('#ghGist').value.trim();
+  gh.auto = $('#ghAuto').checked;
+  saveGh();
+  syncNow(false);
+});
+$('#ghAuto').addEventListener('change', e => { gh.auto = e.target.checked; saveGh(); });
+$('#btnGhClear').addEventListener('click', () => {
+  if (!confirm('この端末の同期設定（トークン・Gist ID）を消します。Gist 上のデータは残ります。')) return;
+  gh = { token: '', gistId: '', auto: true };
+  saveGh();
+  $('#ghToken').value = ''; $('#ghGist').value = '';
+  setSyncStatus(''); toast('接続を解除しました');
+});
+
+// 画面に戻ってきたら取り込み、離れるときは書き出す
+document.addEventListener('visibilitychange', () => {
+  if (!gh.token || !gh.auto) return;
+  syncNow(true);
+});
+
+/* ============================================================
+   起動
+============================================================ */
+$('#ghToken').value = gh.token;
+$('#ghGist').value = gh.gistId;
+$('#ghAuto').checked = gh.auto;
+setSyncStatus(gh.lastSync ? '前回: ' + new Date(gh.lastSync).toLocaleString('ja-JP') : '');
+
+renderRoutinePick();
+renderLog();
+if (gh.token) syncNow(true);
+</script>
+</body>
+</html>
