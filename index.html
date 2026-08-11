@@ -305,6 +305,20 @@
   .pick{display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line); font-size:calc(15px * var(--fs))}
   .pick .cat{font-size:calc(11px * var(--fs)); color:var(--muted)}
   .pick.sel{color:var(--accent2); font-weight:600}
+  /* 種目のポイントを開くボタン */
+  .tipbtn{
+    width:26px; height:26px; flex:0 0 auto; border-radius:50%; padding:0;
+    background:var(--panel2); border:1px solid var(--line); color:var(--muted);
+    font-size:calc(13px * var(--fs)); font-weight:700; line-height:1;
+  }
+  .tipbtn:active{background:var(--accent); color:var(--on-accent); border-color:var(--accent)}
+  ul.tips{margin:0; padding-left:1.1em}
+  ul.tips li{margin-bottom:8px; font-size:calc(14px * var(--fs)); line-height:1.6}
+  .tipnote{
+    margin-top:14px; padding:9px 11px; border-radius:10px;
+    background:var(--panel2); border:1px solid var(--line);
+    font-size:calc(11px * var(--fs)); color:var(--muted); line-height:1.6;
+  }
   /* 設定画面の配色スウォッチ */
   .swatches{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
   .sw{
@@ -627,6 +641,20 @@
   </div>
 </div>
 
+<!-- 種目のポイント -->
+<div class="modal" id="mTips">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3 id="tipTitle">ポイント</h3>
+    <div id="tipBody"></div>
+    <div class="tipnote">
+      一般的な注意点です。痛みや違和感が出たら中止してください。
+      持病や既往がある場合、また高重量を扱う場合は、専門家の指導を受けることをおすすめします。
+    </div>
+    <button class="btn block ghost" data-close style="margin-top:12px">閉じる</button>
+  </div>
+</div>
+
 <!-- 計算機 -->
 <div class="modal" id="mCalc">
   <div class="backdrop" data-close></div>
@@ -946,10 +974,16 @@ const sortedSessions = () => db.sessions.slice().sort((a, b) => b.date < a.date 
 function daySummaryOf(en, kind) {
   const done = en.sets.filter(filled);
   if (!done.length) return null;
-  const mx = f => Math.max.apply(null, done.map(f));
-  if (kind === 'cardio') return { d: mx(x => num(x.d)), t: mx(x => num(x.t)) };
-  if (kind === 'bw') return { r: mx(x => num(x.r)) };
-  return { w: mx(x => num(x.w)), r: mx(x => num(x.r)), e: mx(x => e1rm(num(x.w), num(x.r))) };
+  // 重量と回数を別々に最大値で取ると、軽い高回数セットと重いセットが混ざって
+  // 実在しない組み合わせになる。その日の一番きついセットを1つ選んで代表にする。
+  const pick = score => done.reduce((a, b) => score(b) > score(a) ? b : a, done[0]);
+  if (kind === 'cardio') {
+    const top = pick(x => num(x.d) * 1000 + num(x.t));
+    return { d: num(top.d), t: num(top.t) };
+  }
+  if (kind === 'bw') return { r: Math.max.apply(null, done.map(x => num(x.r))) };
+  const top = pick(x => e1rm(num(x.w), num(x.r)));
+  return { w: num(top.w), r: num(top.r), e: e1rm(num(top.w), num(top.r)) };
 }
 // その種目を実施した日の要約を古い順に返す
 function exDays(exId) {
@@ -1131,6 +1165,7 @@ function renderLog() {
           (pr.isPr ? '<span class="pr-badge" title="自己ベスト更新">🏆</span>' : '') +
           '<div class="name">' + esc(ex.name) + '</div>' +
           (ex.cat ? '<div class="cat">' + esc(ex.cat) + '</div>' : '') +
+          '<button class="btn sm ghost" data-act="tips" data-e="' + ei + '" title="ポイントを見る">?</button>' +
           '<button class="btn sm ghost" data-act="chart" data-e="' + ei + '" title="推移を見る">📈</button>' +
           '<button class="btn sm ghost" data-act="delex" data-e="' + ei + '">✕</button>' +
         '</div>' +
@@ -1414,6 +1449,7 @@ $('#logBody').addEventListener('click', e => {
     toast(g.text + ' を ' + n + 'セットに入れました');
     return;
   }
+  if (act === 'tips') { openTips(sess.entries[+btn.dataset.e].exId); return; }
   if (act === 'chart') {
     openExChart(sess.entries[+btn.dataset.e].exId);
     return;
@@ -1567,7 +1603,9 @@ function renderPick() {
     (!pickCat || e.cat === pickCat) && (!q || e.name.toLowerCase().includes(q))
   );
   $('#pickList').innerHTML = list.length
-    ? list.map(e => '<div class="pick" data-id="' + esc(e.id) + '"><div style="flex:1">' + esc(e.name) + '</div><div class="cat">' + esc(e.cat) + '</div></div>').join('')
+    ? list.map(e => '<div class="pick" data-id="' + esc(e.id) + '"><div style="flex:1">' + esc(e.name) + '</div>' +
+        '<div class="cat">' + esc(e.cat) + '</div>' +
+        '<button class="tipbtn" data-tip="' + esc(e.id) + '" title="ポイントを見る">?</button></div>').join('')
     : '<div class="empty">該当なし。「種目」タブから追加できます。</div>';
 }
 $('#btnAddEx').addEventListener('click', () => {
@@ -1580,6 +1618,8 @@ $('#pickCats').addEventListener('click', e => {
   pickCat = c.dataset.cat; renderPick();
 });
 $('#pickList').addEventListener('click', e => {
+  const tip = e.target.closest('[data-tip]');
+  if (tip) { openTips(tip.dataset.tip); return; }   // ? は種目の追加と別扱い
   const it = e.target.closest('[data-id]'); if (!it) return;
   addExerciseToDay(it.dataset.id);
   closeModal('#mPick');
@@ -2148,6 +2188,7 @@ function renderExMaster() {
     '<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--muted);margin:8px 0 2px">' + esc(c) + '</div>' +
     db.exercises.filter(e => e.cat === c).map(e =>
       '<div class="list-item"><div class="t"><b>' + esc(e.name) + '</b></div>' +
+      '<button class="tipbtn" data-tip="' + esc(e.id) + '" title="ポイントを見る">?</button>' +
       '<button class="chip' + (e.kind !== 'weight' ? ' on' : '') + '" data-kind="' + esc(e.id) + '" title="記録形式を切り替える">' + KINDS[e.kind] + '</button>' +
       '<button class="btn sm danger" data-delex="' + esc(e.id) + '">削除</button></div>').join('') +
     '</div>').join('') || '<div class="empty">種目がありません。</div>';
@@ -2172,6 +2213,8 @@ $('#btnNewEx').addEventListener('click', () => {
 });
 
 $('#v-ex').addEventListener('click', e => {
+  const tip = e.target.closest('[data-tip]');
+  if (tip) { openTips(tip.dataset.tip); return; }
   const kb = e.target.closest('[data-kind]');
   if (kb) {
     const ex = exById(kb.dataset.kind);
@@ -2433,6 +2476,142 @@ document.addEventListener('visibilitychange', () => {
   if (!gh.token || !gh.auto) return;
   syncNow(true);
 });
+
+/* ============================================================
+   種目のポイント（Tips）
+============================================================ */
+const TIPS = {
+  // --- 胸 ---
+  'ベンチプレス': ['肩甲骨を寄せて下げ、胸を張った姿勢を最後まで崩さない',
+    'バーは乳頭のあたりへ。首や鎖骨に下ろすと肩を痛めやすい',
+    '肘は体側から45〜60度。真横に開くと肩の負担が大きい',
+    '足で床を押して全身で支える。高重量では必ずセーフティを使う'],
+  'ダンベルプレス': ['バーベルより深く下ろせるのが利点。肩の前が痛む手前で止める',
+    '手首を寝かせない。前腕とダンベルを一直線に保つ',
+    '左右差が出やすいので、弱い側に合わせて重量を決める'],
+  'チェストプレス': ['軌道が固定されるのでフォームが安定しやすい。初心者向き',
+    'シート高はグリップが胸の高さに来る位置に合わせる',
+    '押し切ったところで肘を完全にロックしない'],
+  'ダンベルフライ': ['肘は軽く曲げた角度で固定したまま、弧を描いて下ろす',
+    '肩の前に負担が集中しやすい。可動域は浅めから試す',
+    '重量を追わず、胸が伸びる感覚を優先する'],
+  '腕立て伏せ': ['頭からかかとまで一直線。腰が落ちる・上がるのを避ける',
+    '手幅は肩幅の1.2〜1.5倍が目安。広げすぎると肩に負担',
+    'きつければ膝をつく、余裕があれば足を台に乗せて負荷を上げる'],
+
+  // --- 背中 ---
+  'デッドリフト': ['背中を丸めない。これが最優先。丸まるなら重量を落とす',
+    'バーは体に沿わせて上げる。体から離れるほど腰の負担が増える',
+    '膝ではなく股関節から動かす意識。お尻で持ち上げる',
+    '腰に不安があるなら軽い重量とハーフレンジから始める'],
+  'ラットプルダウン': ['胸を張り、バーを鎖骨に向けて引く',
+    '腕で引くより「肘を下に下げる」意識のほうが背中に入る',
+    '首の後ろに下ろすのは肩を痛めやすいので避ける'],
+  '懸垂': ['ぶら下がったら先に肩甲骨を下げ、それから引く',
+    '反動を使わない。できないうちはバンド補助や斜め懸垂で代用',
+    '下ろすときもゆっくり。落下させない'],
+  'ベントオーバーロー': ['上体は45度前後で固定。動作中に起き上がらない',
+    'みぞおち〜へそに向けて引く。肩に向けると僧帽筋に逃げる',
+    '腰が丸まるならウェイトが重すぎる合図'],
+  'シーテッドロー': ['引く時に体を後ろに倒しすぎない',
+    '肩をすくめず、肩甲骨を寄せる意識で',
+    '戻す時も制御して、背中が伸びるところまで'],
+
+  // --- 脚 ---
+  'スクワット': ['膝とつま先の向きを揃える。膝が内に入らないよう注意',
+    'まず股関節を後ろに引いてから座る。膝から出ると膝に負担',
+    '背中は中立を保つ。深さは腰が丸まらない範囲まで',
+    'ラックで行う時はセーフティを必ずセットする'],
+  'レッグプレス': ['腰が浮くところまで下げない。腰椎を痛める原因',
+    '押し切って膝を完全にロックしない',
+    '足の位置が高いとお尻・ハム、低いと大腿四頭筋に効きやすい'],
+  'レッグエクステンション': ['膝関節への負担が大きいので軽めの重量から',
+    '伸ばし切ったところで1秒止めると効きやすい',
+    '膝に痛みが出たらすぐ中止する'],
+  'レッグカール': ['骨盤や腰を浮かせない。反動で上げない',
+    '戻す動作をゆっくり行うほうが効く',
+    'ハムストリングは肉離れしやすいので入念に温める'],
+  'ブルガリアンスクワット': ['体重は前脚に乗せる。後ろ脚は支えるだけ',
+    'バランスが取れないなら台を低くする',
+    '前脚の膝がつま先より大きく前に出ない位置に立つ'],
+  'カーフレイズ': ['可動域をフルに使う。下で伸ばし、上で止める',
+    '反動を使わずゆっくり。回数は多め（15〜20回）が効きやすい'],
+
+  // --- 肩 ---
+  'ショルダープレス': ['腰を反らせない。反るなら重量を落とすか座って行う',
+    '肘は真横より少し前に。肩の詰まりを避けられる',
+    '押し切りで肩をすくめない'],
+  'サイドレイズ': ['軽い重量で十分。反動を使うと効かない',
+    '肩をすくめず、肩の高さまで上げれば十分',
+    '肘を軽く曲げ、小指側をやや上に向けると入りやすい'],
+  'リアレイズ': ['上体を前傾させて行う。立ったままだと効きにくい',
+    '肩甲骨を寄せすぎると背中の種目になる。腕で外に開く意識',
+    '最も軽い重量で回数を多めに'],
+  'アップライトロー': ['手幅が狭すぎると肩を挟み込みやすい。肩幅程度に',
+    '肘を肩の高さより上げない',
+    '肩に違和感が出るなら無理に行わず、サイドレイズで代替する'],
+
+  // --- 腕 ---
+  'アームカール': ['肘を体側に固定し、動かさない',
+    '反動で上げない。上げる勢いより下ろす動作を丁寧に',
+    '手首を反らせず、まっすぐ保つ'],
+  'ハンマーカール': ['親指を上に向けたまま保つ',
+    '上腕二頭筋に加えて前腕にも効く。腕を太くしたい人向き'],
+  'トライセプスプレスダウン': ['肘を体側に固定。肘が前後に動くと効かない',
+    '体を前傾させて体重で押さない',
+    '伸ばし切ったところで1秒止める'],
+  'スカルクラッシャー': ['肘の位置を固定したまま、前腕だけを動かす',
+    '肘に痛みが出やすい種目。違和感があれば中止する',
+    'ストレートバーよりEZバーのほうが手首が楽'],
+
+  // --- 体幹 ---
+  'アブローラー': ['腰を反らせない。反るなら出しすぎ',
+    'まず膝をついた「膝コロ」から。戻れる範囲までしか出さない',
+    '息を止めず、出す時に吐く'],
+  'プランク': ['頭からかかとまで一直線。お尻を上げない・落とさない',
+    '時間を伸ばすより姿勢を保てる範囲で切る',
+    '呼吸を止めない。腰が落ちてきたら終了の合図'],
+  'レッグレイズ': ['腰を床につけたまま行う。腰が浮くと腰痛の原因',
+    '反動で振らない。下ろす動作をゆっくり',
+    'きつければ膝を曲げて行う'],
+
+  // --- 有酸素 ---
+  'ランニング': ['最初は会話できる程度の強度で。息が上がる強度は後から',
+    '週あたりの距離を増やすのは10%以内に留めると故障しにくい',
+    '靴は消耗品。クッションが落ちたら替える'],
+  'エアロバイク': ['サドル高はペダルが最下点で膝が軽く曲がる位置',
+    '膝や足首への衝撃が少ないので、故障中の代替にも向く',
+    '負荷を上げて回転数を落とすより、一定の回転数を保つほうが続けやすい'],
+};
+
+// 個別のヒントがない種目は部位ごとの一般的な注意点を出す
+const CAT_TIPS = {
+  '胸': ['肩甲骨を寄せて下げた姿勢を保つと肩を痛めにくい', '押し切りで肘をロックしない'],
+  '背中': ['腕で引かず、肘を動かす意識で背中に効かせる', '腰を丸めない'],
+  '脚': ['膝とつま先の向きを揃える', '可動域は腰が丸まらない範囲まで'],
+  '肩': ['軽い重量から。肩は小さく痛めやすい関節', '肩をすくめない'],
+  '腕': ['肘の位置を固定し、反動を使わない', '下ろす動作をゆっくり行う'],
+  '体幹': ['腰を反らせない', '呼吸を止めない'],
+  '有酸素': ['強度より頻度を優先して習慣にする', '距離や時間は少しずつ増やす'],
+  'その他': ['痛みが出たら中止する', '重量よりフォームを優先する'],
+};
+const GENERIC_TIPS = ['痛みが出たら中止する', '重量よりフォームを優先する', '反動を使わず、下ろす動作を丁寧に'];
+
+function tipsFor(exId) {
+  const ex = exById(exId) || {};
+  return TIPS[ex.name] || CAT_TIPS[ex.cat] || GENERIC_TIPS;
+}
+function openTips(exId) {
+  const ex = exById(exId) || {};
+  const own = !!TIPS[ex.name];
+  $('#tipTitle').textContent = ex.name || '種目のポイント';
+  $('#tipBody').innerHTML =
+    '<div style="font-size:calc(11px * var(--fs));color:var(--muted);margin-bottom:8px">' +
+    esc((ex.cat || '') + '　' + (KINDS[ex.kind] || '')) +
+    (own ? '' : '（この種目の個別ヒントは未登録のため、部位の一般的な注意点を表示しています）') + '</div>' +
+    '<ul class="tips">' + tipsFor(exId).map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>';
+  openModal('#mTips');
+}
 
 /* ============================================================
    計算機（1RM換算 / プレート）
