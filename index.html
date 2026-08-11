@@ -124,6 +124,7 @@
   .prev-line{font-size:12px; color:var(--muted); padding:8px 14px 0}
   .sets{padding:8px 10px 12px}
   .set-row{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; align-items:center; margin-bottom:6px}
+  .set-row.bw, .set-head.bw{grid-template-columns:22px 1fr 38px 28px}
   .set-row .n{text-align:center; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
   .set-row input{padding:12px 8px; text-align:center; font-size:16px; font-variant-numeric:tabular-nums}
   .set-row input::placeholder{color:color-mix(in srgb, var(--muted) 65%, transparent)}
@@ -430,9 +431,12 @@
       <h2>種目を追加</h2>
       <div class="row">
         <input type="text" id="newExName" placeholder="種目名">
-        <select id="newExCat" style="width:110px"></select>
+        <select id="newExCat" style="width:100px"></select>
         <button class="btn primary" id="btnNewEx">追加</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-size:13px;color:var(--muted)">
+        <input type="checkbox" id="newExBw" style="width:auto"> 自重・有酸素（重量を記録しない）
+      </label>
     </div>
     <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1.6">
       <h2>種目マスタ</h2>
@@ -616,6 +620,9 @@ const DEFAULT_EX = [
   ['アブローラー','体幹'],['プランク','体幹'],['レッグレイズ','体幹'],
   ['ランニング','有酸素'],['エアロバイク','有酸素'],
 ];
+// 重量欄を出さない種目（自重・有酸素）。種目タブで個別に切り替えられる
+const BW_DEFAULT = ['腕立て伏せ', '懸垂', 'アブローラー', 'プランク', 'レッグレイズ', 'ランニング', 'エアロバイク'];
+const isBw = exId => !!(exById(exId) || {}).bw;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 const nowISO = () => new Date().toISOString();
@@ -624,7 +631,7 @@ const nowISO = () => new Date().toISOString();
 function seed() {
   return {
     v: 2,
-    exercises: DEFAULT_EX.map(([name, cat]) => ({ id: name, name, cat, u: '' })),
+    exercises: DEFAULT_EX.map(([name, cat]) => ({ id: name, name, cat, bw: BW_DEFAULT.includes(name), u: '' })),
     routines: [],   // {id:name, name, exIds, u}
     sessions: [],   // {id, date:'YYYY-MM-DD', u, entries:[{exId, sets:[{w,r}]}]}
     tomb: { s: {}, e: {}, r: {} },   // 削除の墓標: {キー: 削除時刻ISO}
@@ -661,7 +668,11 @@ function normalize(d) {
     for (const ss of d.sessions) for (const en of ss.entries || []) en.exId = exMap[en.exId] || en.exId;
     d.v = 2;
   }
-  for (const e of d.exercises) if (!e.u) e.u = '';
+  for (const e of d.exercises) {
+    if (!e.u) e.u = '';
+    // bw 未設定の既存データは、既定の自重種目リストから補う
+    if (typeof e.bw !== 'boolean') e.bw = BW_DEFAULT.includes(e.name);
+  }
   for (const r of d.routines) if (!r.u) r.u = '';
   for (const ss of d.sessions) { if (!ss.id) ss.id = uid(); if (!ss.u) ss.u = ''; if (!Array.isArray(ss.entries)) ss.entries = []; }
   return d;
@@ -697,6 +708,8 @@ const setVol = s => num(s.w) * num(s.r);
 
 // 回数が入っていれば「実施した」とみなす。自重種目は重量0でも1セットとして数える
 const filled = s => num(s.r) > 0;
+// 表示用のセット表記。自重種目は重量を出さない
+const setLabel = (s, bw) => bw ? num(s.r) + '回' : num(s.w) + 'kg×' + num(s.r);
 
 function sessionVolume(sess) {
   let v = 0;
@@ -816,15 +829,17 @@ function renderLog() {
       const ex = exById(en.exId) || { name: exName(en.exId), cat: '' };
       const prev = prevSets(en.exId, curDate);
       const prevTxt = prev
-        ? '前回 ' + mdLabel(prev.date) + '：' + prev.sets.map(s => num(s.w) + 'kg×' + num(s.r)).join(' / ')
+        ? '前回 ' + mdLabel(prev.date) + '：' + prev.sets.map(s => setLabel(s, ex.bw)).join(' / ')
         : '前回の記録なし';
 
       const ro = inputMode === 'wheel' ? ' readonly' : '';
+      const bw = !!ex.bw;                      // 自重・有酸素は重量欄を出さない
       const rows = en.sets.map((s, si) => {
         const ph = prev && prev.sets[si] ? prev.sets[si] : (prev ? prev.sets[prev.sets.length - 1] : null);
-        return '<div class="set-row' + (filled(s) ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
+        return '<div class="set-row' + (bw ? ' bw' : '') + (filled(s) ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
           '<div class="n">' + (si + 1) + '</div>' +
-          '<input type="number" inputmode="decimal" step="0.1" class="in-w"' + ro + ' value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
+          (bw ? '' :
+            '<input type="number" inputmode="decimal" step="0.1" class="in-w"' + ro + ' value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">') +
           '<input type="number" inputmode="numeric" step="1" class="in-r"' + ro + ' value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
           '<button class="cp" data-act="copydown" title="同じ内容で次のセット">↪</button>' +
           '<button class="del" data-act="delset">×</button>' +
@@ -840,7 +855,7 @@ function renderLog() {
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + '</div>' +
         '<div class="sets">' +
-          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>追加</div><div></div></div>' +
+          '<div class="set-head' + (bw ? ' bw' : '') + '"><div></div>' + (bw ? '' : '<div>重量(kg)</div>') + '<div>回数</div><div>追加</div><div></div></div>' +
           rows +
         '</div>' +
         '<div class="ex-foot">' +
@@ -1060,7 +1075,8 @@ $('#logBody').addEventListener('click', e => {
     const si = +row.dataset.s;
     const s = en.sets[si];
     const fill = (v, ph, unit) => (v === '' || v == null) ? (ph && ph !== unit ? ph : '') : v;
-    const w = fill(s.w, row.querySelector('.in-w').placeholder, 'kg');
+    const wIn = row.querySelector('.in-w');            // 自重種目には重量欄がない
+    const w = wIn ? fill(s.w, wIn.placeholder, 'kg') : (s.w || '');
     const r = fill(s.r, row.querySelector('.in-r').placeholder, '回');
     if (w === '' && r === '') { toast('コピーする値がありません'); return; }
     const next = en.sets[si + 1];
@@ -1356,7 +1372,7 @@ function renderHist() {
   $('#histBody').innerHTML = ss.length ? ss.map(s => {
     const detail = s.entries.map(en => {
       const done = en.sets.filter(filled);
-      const txt = done.length ? done.map(x => num(x.w) + '×' + num(x.r)).join(' / ') : '未完了';
+      const txt = done.length ? done.map(x => setLabel(x, isBw(en.exId))).join(' / ') : '未記入';
       const c = CAT_COLOR[catOf(en.exId)] || '#94a3b8';
       return '<div><span style="color:' + c + '">●</span> ' + esc(exName(en.exId)) + '　' + esc(txt) + '</div>';
     }).join('');
@@ -1489,32 +1505,51 @@ window.addEventListener('resize', () => {
   }, 200);
 });
 
-// 種目の推移データ。分析タブと種目別グラフのシートで共用
+// 種目の推移データ。分析タブと種目別グラフのシートで共用。
+// 自重種目は重量が無いので、1RMや最大重量ではなく回数で見る。
 function exPoints(exId, mt) {
+  const bw = isBw(exId);
   const pts = [];
   for (const s of db.sessions.slice().sort((a, b) => a.date < b.date ? -1 : 1)) {
     const en = s.entries.find(e => e.exId === exId); if (!en) continue;
-    const done = en.sets.filter(x => filled(x) && num(x.w) > 0);
+    const done = en.sets.filter(x => bw ? filled(x) : (filled(x) && num(x.w) > 0));
     if (!done.length) continue;
-    const v = mt === 'vol' ? done.reduce((a, x) => a + setVol(x), 0)
-            : mt === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
-            : Math.max.apply(null, done.map(x => e1rm(num(x.w), num(x.r))));
+    const reps = done.map(x => num(x.r));
+    const v = bw
+      ? (mt === 'vol' ? reps.reduce((a, b) => a + b, 0) : Math.max.apply(null, reps))
+      : (mt === 'vol' ? done.reduce((a, x) => a + setVol(x), 0)
+        : mt === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
+        : Math.max.apply(null, done.map(x => e1rm(num(x.w), num(x.r)))));
     // 高回数だと Epley 式は過大に出るので、注意表示のために最大回数も持たせる
-    pts.push({ label: mdLabel(s.date), date: s.date, v, maxReps: Math.max.apply(null, done.map(x => num(x.r))) });
+    pts.push({ label: mdLabel(s.date), date: s.date, v, maxReps: Math.max.apply(null, reps) });
   }
+  pts.unit = bw ? '回' : 'kg';
   return pts;
 }
-function bestLine(pts, mt) {
+function bestLine(pts, mt, exId) {
   if (!pts.length) return '';
+  const bw = isBw(exId);
   const max = Math.max.apply(null, pts.map(p => p.v));
-  const name = mt === 'vol' ? '最高ボリューム' : mt === 'top' ? '最大重量' : '推定1RM 最高';
-  const over = mt === 'e1rm' && pts.some(p => p.maxReps > 10);
-  return name + '：' + (Math.round(max * 10) / 10) + ' kg' +
-    (mt === 'e1rm' ? (over ? '（⚠ 11回以上のセットを含むため過大評価の可能性）' : '（Epley式）') : '');
+  const name = bw
+    ? (mt === 'vol' ? '最高 合計回数' : '最高 連続回数')
+    : (mt === 'vol' ? '最高ボリューム' : mt === 'top' ? '最大重量' : '推定1RM 最高');
+  const over = !bw && mt === 'e1rm' && pts.some(p => p.maxReps > 10);
+  return name + '：' + (Math.round(max * 10) / 10) + ' ' + (bw ? '回' : 'kg') +
+    (!bw && mt === 'e1rm' ? (over ? '（⚠ 11回以上のセットを含むため過大評価の可能性）' : '（Epley式）') : '');
+}
+// 自重種目では重量ベースの指標が無いので、チップの表示も差し替える
+function labelMetrics(scope, bw) {
+  const labels = bw ? { e1rm: '最高回数', top: '最高回数', vol: '合計回数' }
+                    : { e1rm: '推定1RM', top: '最大重量', vol: 'ボリューム' };
+  $$(scope).forEach(c => {
+    const k = c.dataset.metric || c.dataset.cmetric;
+    c.textContent = labels[k];
+    c.style.display = (bw && k === 'top') ? 'none' : '';
+  });
 }
 function drawInto(box, pts) {
   box.innerHTML = !pts.length ? '<div class="empty">データがありません。</div>'
-    : pts.length === 1 ? singleValue(pts[0], 'kg')
+    : pts.length === 1 ? singleValue(pts[0], pts.unit || 'kg')
     : lineChart(pts.slice(-20), box);
 }
 
@@ -1522,9 +1557,10 @@ function renderExChart() {
   const exId = $('#statEx').value;
   const box = $('#exChart'), best = $('#exBest');
   if (!exId) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
+  labelMetrics('#v-stats .chip', isBw(exId));
   const pts = exPoints(exId, metric);
   drawInto(box, pts);
-  best.textContent = bestLine(pts, metric);
+  best.textContent = bestLine(pts, metric, exId);
 }
 
 /* ---- 種目別グラフのシート（記録ページの 📈 から開く） ---- */
@@ -1538,9 +1574,10 @@ function openExChart(exId) {
 }
 function renderChartSheet() {
   if (!chExId) return;
+  labelMetrics('[data-cmetric]', isBw(chExId));
   const pts = exPoints(chExId, chMetric);
   drawInto($('#chBox'), pts);
-  $('#chBest').textContent = bestLine(pts, chMetric);
+  $('#chBest').textContent = bestLine(pts, chMetric, chExId);
 
   // 直近の記録を新しい順に
   const rows = [];
@@ -1549,9 +1586,10 @@ function renderChartSheet() {
     const done = en.sets.filter(filled);
     if (!done.length) continue;
     rows.push('<div class="list-item"><div class="t"><b>' + s.date + '</b><span>' +
-      esc(done.map(x => num(x.w) + 'kg×' + num(x.r)).join(' / ')) + '</span></div>' +
+      esc(done.map(x => setLabel(x, isBw(chExId))).join(' / ')) + '</span></div>' +
       '<div style="font-size:12px;color:var(--muted);white-space:nowrap">' +
-      fmt(done.reduce((a, x) => a + setVol(x), 0)) + ' kg</div></div>');
+      (isBw(chExId) ? fmt(done.reduce((a, x) => a + num(x.r), 0)) + ' 回'
+                    : fmt(done.reduce((a, x) => a + setVol(x), 0)) + ' kg') + '</div></div>');
     if (rows.length >= 30) break;
   }
   $('#chList').innerHTML = rows.length ? rows.join('') : '<div class="empty">記録がありません。</div>';
@@ -1684,6 +1722,7 @@ function renderExMaster() {
     '<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--muted);margin:8px 0 2px">' + esc(c) + '</div>' +
     db.exercises.filter(e => e.cat === c).map(e =>
       '<div class="list-item"><div class="t"><b>' + esc(e.name) + '</b></div>' +
+      '<button class="chip' + (e.bw ? ' on' : '') + '" data-bw="' + esc(e.id) + '" title="重量欄を出さない">自重</button>' +
       '<button class="btn sm danger" data-delex="' + esc(e.id) + '">削除</button></div>').join('') +
     '</div>').join('') || '<div class="empty">種目がありません。</div>';
 
@@ -1699,13 +1738,22 @@ $('#btnNewEx').addEventListener('click', () => {
   const name = $('#newExName').value.trim();
   if (!name) { toast('種目名を入力してください'); return; }
   if (db.exercises.some(e => e.name === name)) { toast('同名の種目があります'); return; }
-  db.exercises.push({ id: name, name, cat: $('#newExCat').value, u: nowISO() });
+  db.exercises.push({ id: name, name, cat: $('#newExCat').value, bw: $('#newExBw').checked, u: nowISO() });
+  $('#newExBw').checked = false;
   delete db.tomb.e[name];
   $('#newExName').value = '';
   save(); renderExMaster(); toast('追加しました');
 });
 
 $('#v-ex').addEventListener('click', e => {
+  const bw = e.target.closest('[data-bw]');
+  if (bw) {
+    const ex = exById(bw.dataset.bw);
+    ex.bw = !ex.bw; ex.u = nowISO();
+    save(); renderExMaster();
+    toast(ex.name + '：' + (ex.bw ? '重量欄を出しません' : '重量を記録します'));
+    return;
+  }
   const dx = e.target.closest('[data-delex]');
   if (dx) {
     const id = dx.dataset.delex;
