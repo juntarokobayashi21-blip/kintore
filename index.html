@@ -2458,17 +2458,19 @@ function renderThemePicker() {
   $('#cusA').value = theme.custom.a;
   $('#cusB').value = theme.custom.b;
 
+  // 実際は単色で使うので、混ぜずに2色を並べて見せる
+  const split = (x, y) => 'background:linear-gradient(90deg,' + x + ' 0 50%,' + y + ' 50% 100%)';
+
   $('#accentList').innerHTML = Object.keys(ACCENTS).map(k => {
     const a = ACCENTS[k];
     return '<button class="sw' + (theme.accent === k ? ' on' : '') + '" data-accent="' + k + '">' +
-      '<span class="bar2" style="background:linear-gradient(135deg,' + a.a + ',' + a.mid + ',' + a.b + ')"></span>' +
-      a.name + '</button>';
+      '<span class="bar2" style="' + split(a.a, a.b) + '"></span>' + a.name + '</button>';
   }).join('');
   $('#baseList').innerHTML = Object.keys(BASES).map(k => {
     const b = BASES[k].v;
     return '<button class="sw' + (theme.base === k ? ' on' : '') + '" data-base="' + k + '">' +
-      '<span class="bar2" style="background:linear-gradient(135deg,' + b['--bg'] + ' 0%,' + b['--panel2'] + ' 100%);' +
-      'border:1px solid ' + b['--line'] + '"></span>' + BASES[k].name + '</button>';
+      '<span class="bar2" style="' + split(b['--bg'], b['--panel2']) + ';border:1px solid ' + b['--line'] + '"></span>' +
+      BASES[k].name + '</button>';
   }).join('');
 }
 
