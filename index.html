@@ -13,46 +13,52 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
+  /* 画面全体は固定。スクロールが要る部分だけ .scroll が内側で持つ */
   body{
     background:var(--bg); color:var(--fg);
     font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Noto Sans JP",sans-serif;
     font-size:16px; line-height:1.5;
-    padding-bottom:calc(72px + env(safe-area-inset-bottom));
+    height:100vh; height:100dvh; overflow:hidden;
+    display:flex; flex-direction:column;
   }
   input,select,button,textarea{font:inherit; color:inherit}
   button{cursor:pointer}
 
   header{
-    position:sticky; top:0; z-index:20; background:rgba(14,17,22,.92);
-    backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
-    padding:10px 14px calc(10px + env(safe-area-inset-top)) 14px;
-    padding-top:calc(10px + env(safe-area-inset-top));
-    display:flex; align-items:center; gap:10px;
+    flex:0 0 auto; z-index:20; background:var(--bg);
+    border-bottom:1px solid var(--line);
+    padding:8px 12px; padding-top:calc(8px + env(safe-area-inset-top));
+    display:flex; align-items:center; gap:8px;
   }
-  header h1{font-size:17px; margin:0; font-weight:700; letter-spacing:.02em}
+  header h1{font-size:16px; margin:0; font-weight:700; letter-spacing:.02em}
   header .spacer{flex:1}
 
-  main{padding:14px; max-width:720px; margin:0 auto}
-  .view{display:none}
-  .view.active{display:block}
+  main{
+    flex:1; min-height:0; padding:10px 12px; width:100%;
+    max-width:720px; margin:0 auto; display:flex; flex-direction:column;
+  }
+  .view{display:none; flex:1; min-height:0; flex-direction:column}
+  .view.active{display:flex}
+  /* ページ内で唯一スクロールする領域 */
+  .scroll{flex:1; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain}
 
   nav{
-    position:fixed; left:0; right:0; bottom:0; z-index:30;
+    flex:0 0 auto; z-index:30;
     display:grid; grid-template-columns:repeat(4,1fr);
-    background:rgba(23,28,36,.96); backdrop-filter:blur(8px);
-    border-top:1px solid var(--line);
+    background:var(--panel); border-top:1px solid var(--line);
     padding-bottom:env(safe-area-inset-bottom);
   }
   nav button{
     background:none; border:0; color:var(--muted);
-    padding:10px 4px 12px; font-size:11px; display:flex;
-    flex-direction:column; align-items:center; gap:3px;
+    padding:7px 4px 8px; font-size:10px; display:flex;
+    flex-direction:column; align-items:center; gap:2px;
   }
-  nav button .ic{font-size:19px; line-height:1}
+  nav button .ic{font-size:18px; line-height:1}
   nav button.active{color:var(--accent)}
 
-  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:14px; margin-bottom:12px}
-  .card h2{font-size:14px; margin:0 0 10px; color:var(--muted); font-weight:600; letter-spacing:.04em}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:12px; margin-bottom:8px}
+  .card:last-child{margin-bottom:0}
+  .card h2{font-size:13px; margin:0 0 8px; color:var(--muted); font-weight:600; letter-spacing:.04em}
 
   .row{display:flex; align-items:center; gap:8px}
   .btn{
@@ -94,7 +100,14 @@
   .set-head{display:grid; grid-template-columns:22px 1fr 1fr 42px 30px 26px; gap:5px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
 
-  .empty{text-align:center; color:var(--muted); padding:30px 10px; font-size:14px}
+  .empty{text-align:center; color:var(--muted); padding:24px 10px; font-size:13px}
+
+  /* 記録ページ下部のサマリー行 */
+  .daybar{
+    display:flex; gap:10px; justify-content:center; align-items:center;
+    font-size:12px; color:var(--muted); padding:7px 0 8px;
+  }
+  .daybar b{color:var(--fg); font-variant-numeric:tabular-nums; font-size:14px; margin-right:2px}
 
   /* --- カレンダー --- */
   /* 左にカレンダー、右に負荷量パネル */
@@ -167,7 +180,9 @@
   .stat b{display:block; font-size:20px; font-variant-numeric:tabular-nums}
   .stat span{font-size:11px; color:var(--muted)}
 
-  svg.chart{width:100%; height:180px; display:block; overflow:visible}
+  .chartcard{display:flex; flex-direction:column; min-height:0; flex:1}
+  .chartbox{flex:1; min-height:80px; display:flex; margin-top:6px}
+  svg.chart{width:100%; height:100%; display:block; overflow:visible}
   svg .grid{stroke:var(--line); stroke-width:1}
   svg .axis{fill:var(--muted); font-size:10px}
   svg .ln{fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round}
@@ -201,14 +216,15 @@
 <body>
 
 <header>
+  <button class="btn sm ghost" id="btnBack" style="display:none">‹</button>
   <h1 id="hdr">筋トレ記録</h1>
   <div class="spacer"></div>
   <button class="btn sm ghost" id="btnBackup">バックアップ</button>
 </header>
 
 <main>
-  <!-- ========== 記録 ========== -->
-  <section class="view active" id="v-log">
+  <!-- ========== ホーム ========== -->
+  <section class="view active" id="v-home">
     <div class="card hero">
       <div class="hero-cal">
         <div class="cal-head">
@@ -234,37 +250,40 @@
       </div>
     </div>
 
-    <div class="card">
-      <div class="row">
-        <div style="flex:1">
-          <label class="fld">日付</label>
-          <input type="date" id="logDate">
-        </div>
-        <div style="flex:1">
-          <label class="fld">ルーティン読込</label>
-          <select id="routinePick"><option value="">選択…</option></select>
-        </div>
-      </div>
-      <div class="row" style="margin-top:10px">
-        <span style="font-size:12px;color:var(--muted)">入力方式</span>
-        <button class="chip" data-mode="key">キーボード</button>
-        <button class="chip" data-mode="wheel">ホイール</button>
-      </div>
-    </div>
+    <button class="btn primary block lg" id="btnStart" style="margin-bottom:8px">
+      <span id="startLabel">＋ 本日のトレーニングを追加</span>
+    </button>
 
-    <div id="logBody"></div>
-
-    <button class="btn primary block lg" id="btnAddEx">＋ 種目を追加</button>
-
-    <div class="card" style="margin-top:12px">
-      <h2>この日のサマリー</h2>
+    <div class="card" style="margin-bottom:0">
       <div class="stats-grid">
         <div class="stat"><b id="sToday">0</b><span>総ボリューム kg</span></div>
         <div class="stat"><b id="sSets">0</b><span>完了セット</span></div>
         <div class="stat"><b id="sEx">0</b><span>種目数</span></div>
       </div>
-      <button class="btn block ghost sm" id="btnSaveRoutine" style="margin-top:10px">この構成をルーティンとして保存</button>
+      <div id="homeHint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px"></div>
     </div>
+  </section>
+
+  <!-- ========== 記録（ホームから遷移するサブページ） ========== -->
+  <section class="view" id="v-log">
+    <div class="card" style="padding:10px">
+      <div class="row">
+        <input type="date" id="logDate" style="flex:1.2">
+        <select id="routinePick" style="flex:1"><option value="">ルーティン…</option></select>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <span style="font-size:11px;color:var(--muted)">入力</span>
+        <button class="chip" data-mode="key">キーボード</button>
+        <button class="chip" data-mode="wheel">ホイール</button>
+        <div class="spacer" style="flex:1"></div>
+        <button class="btn sm ghost" id="btnSaveRoutine">ルーティン保存</button>
+      </div>
+    </div>
+
+    <div class="scroll" id="logBody"></div>
+
+    <div class="daybar" id="logBar"></div>
+    <button class="btn primary block lg" id="btnAddEx">＋ 種目を追加</button>
   </section>
 
   <!-- ========== 履歴 ========== -->
@@ -278,11 +297,11 @@
       </div>
       <div class="cal-grid wide" id="hcDow"></div>
       <div class="cal-grid wide" id="hcBody"></div>
-      <div id="hcSummary" style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px"></div>
+      <div id="hcSummary" style="font-size:12px;color:var(--muted);text-align:center;margin-top:8px"></div>
     </div>
-    <div class="card">
+    <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1;margin-bottom:0">
       <h2 id="histTitle">記録一覧</h2>
-      <div id="histBody"></div>
+      <div class="scroll" id="histBody"></div>
     </div>
   </section>
 
@@ -297,21 +316,23 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card chartcard">
       <h2>週別 総ボリューム (kg)</h2>
-      <div id="volChart"></div>
+      <div id="volChart" class="chartbox"></div>
     </div>
 
-    <div class="card">
+    <div class="card chartcard" style="margin-bottom:0">
       <h2>種目別の推移</h2>
-      <select id="statEx"></select>
-      <div class="chips" style="margin-top:10px">
+      <div class="row">
+        <select id="statEx" style="flex:1"></select>
+      </div>
+      <div class="chips" style="margin:8px 0 0">
         <button class="chip on" data-metric="e1rm">推定1RM</button>
         <button class="chip" data-metric="top">最大重量</button>
         <button class="chip" data-metric="vol">ボリューム</button>
       </div>
-      <div id="exChart"></div>
-      <div id="exBest" style="font-size:13px;color:var(--muted);margin-top:8px"></div>
+      <div id="exChart" class="chartbox"></div>
+      <div id="exBest" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
     </div>
   </section>
 
@@ -325,19 +346,19 @@
         <button class="btn primary" id="btnNewEx">追加</button>
       </div>
     </div>
-    <div class="card">
+    <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1.6">
       <h2>種目マスタ</h2>
-      <div id="exBody"></div>
+      <div class="scroll" id="exBody"></div>
     </div>
-    <div class="card">
+    <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1;margin-bottom:0">
       <h2>ルーティン</h2>
-      <div id="routineBody"></div>
+      <div class="scroll" id="routineBody"></div>
     </div>
   </section>
 </main>
 
 <nav>
-  <button class="active" data-view="log"><span class="ic">🏋️</span>記録</button>
+  <button class="active" data-view="home"><span class="ic">🏠</span>ホーム</button>
   <button data-view="hist"><span class="ic">📅</span>履歴</button>
   <button data-view="stats"><span class="ic">📈</span>分析</button>
   <button data-view="ex"><span class="ic">⚙️</span>種目</button>
@@ -601,16 +622,26 @@ document.addEventListener('click', e => {
   }
 });
 
-$$('nav button').forEach(b => b.addEventListener('click', () => {
-  $$('nav button').forEach(x => x.classList.toggle('active', x === b));
-  const v = b.dataset.view;
+const TITLES = { home: '筋トレ記録', log: '記録', hist: '履歴', stats: '分析', ex: '種目・ルーティン' };
+let curView = 'home';
+
+function showView(v) {
+  curView = v;
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'v-' + v));
-  $('#hdr').textContent = { log: '筋トレ記録', hist: '履歴', stats: '分析', ex: '種目・ルーティン' }[v];
+  // 記録はホームから開くサブページなので、タブの選択状態はホームのまま
+  const tab = v === 'log' ? 'home' : v;
+  $$('nav button').forEach(x => x.classList.toggle('active', x.dataset.view === tab));
+  $('#btnBack').style.display = v === 'log' ? '' : 'none';
+  $('#hdr').textContent = v === 'log' ? mdLabel(curDate) + ' の記録' : TITLES[v];
+
+  if (v === 'home') renderHome();
+  if (v === 'log') renderLog();
   if (v === 'hist') renderHist();
   if (v === 'stats') renderStats();
   if (v === 'ex') renderExMaster();
-  window.scrollTo(0, 0);
-}));
+}
+$$('nav button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
+$('#btnBack').addEventListener('click', () => showView('home'));
 
 /* ============================================================
    記録ビュー
@@ -662,7 +693,6 @@ function renderLog() {
     }).join('');
   }
   renderDaySummary();
-  renderCal();
 }
 
 /* ---- カレンダー（記録タブと履歴タブで共用） ---- */
@@ -793,16 +823,35 @@ $('#calBody').addEventListener('click', e => {
   const b = e.target.closest('[data-day]'); if (!b) return;
   curDate = b.dataset.day;
   calCursor = curDate.slice(0, 7);   // 前後の月の日を押したらその月へ移動
-  renderLog();
-  $('#logDate').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  renderHome();
 });
 
+// 記録ページ下部の1行サマリー
 function renderDaySummary() {
+  const sess = getSession(curDate, false);
+  $('#logBar').innerHTML =
+    '<div><b>' + (sess ? fmt(sessionVolume(sess)) : 0) + '</b>kg</div>' +
+    '<div><b>' + (sess ? doneSets(sess) : 0) + '</b>セット</div>' +
+    '<div><b>' + (sess ? sess.entries.length : 0) + '</b>種目</div>';
+}
+
+/* ---- ホーム ---- */
+function renderHome() {
+  renderCal();
   const sess = getSession(curDate, false);
   $('#sToday').textContent = sess ? fmt(sessionVolume(sess)) : '0';
   $('#sSets').textContent = sess ? doneSets(sess) : 0;
   $('#sEx').textContent = sess ? sess.entries.length : 0;
+
+  const isToday = curDate === today();
+  $('#startLabel').textContent = isToday
+    ? (sess ? '本日のトレーニングを続ける' : '＋ 本日のトレーニングを追加')
+    : mdLabel(curDate) + ' のトレーニングを' + (sess ? '編集' : '追加');
+  $('#homeHint').textContent = isToday
+    ? '選択中：今日'
+    : '選択中：' + curDate + '（カレンダーで日付を変えられます）';
 }
+$('#btnStart').addEventListener('click', () => showView('log'));
 
 // 入力（値の変更）
 $('#logBody').addEventListener('input', e => {
@@ -888,6 +937,7 @@ $('#logBody').addEventListener('click', e => {
 $('#logDate').addEventListener('change', e => {
   curDate = e.target.value || today();
   calCursor = curDate.slice(0, 7);
+  $('#hdr').textContent = mdLabel(curDate) + ' の記録';
   renderLog();
 });
 
@@ -1045,7 +1095,7 @@ function addExerciseToDay(exId) {
 
 /* ---- ルーティン ---- */
 function renderRoutinePick() {
-  $('#routinePick').innerHTML = '<option value="">選択…</option>' +
+  $('#routinePick').innerHTML = '<option value="">ルーティン…</option>' +
     db.routines.map(r => '<option value="' + esc(r.id) + '">' + esc(r.name) + '</option>').join('');
 }
 $('#routinePick').addEventListener('change', e => {
@@ -1195,8 +1245,7 @@ $('#histBody').addEventListener('click', e => {
   }
   if (act && act.act === 'open') {
     curDate = ds; calCursor = ds.slice(0, 7);
-    renderLog();
-    $$('nav button')[0].click();
+    showView('log');
     return;
   }
   $('#hd-' + ds).classList.toggle('open');
@@ -1499,10 +1548,8 @@ function rerenderAll() {
   renderRoutinePick();
   // 入力中は記録画面を作り直さない（フォーカスと未確定入力が飛ぶため）
   const ae = document.activeElement;
-  if (!(ae && ae.tagName === 'INPUT' && ae.closest('#logBody'))) renderLog();
-  if ($('#v-hist').classList.contains('active')) renderHist();
-  if ($('#v-stats').classList.contains('active')) renderStats();
-  if ($('#v-ex').classList.contains('active')) renderExMaster();
+  if (curView === 'log' && ae && ae.tagName === 'INPUT' && ae.closest('#logBody')) return;
+  showView(curView);
 }
 
 let syncing = false, syncTimer = null;
@@ -1601,7 +1648,7 @@ setSyncStatus(gh.lastSync ? '前回: ' + new Date(gh.lastSync).toLocaleString('j
 
 renderModeChips();
 renderRoutinePick();
-renderLog();
+showView('home');
 if (gh.token) syncNow(true);
 </script>
 </body>
