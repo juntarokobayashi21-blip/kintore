@@ -87,17 +87,17 @@
   .ex-head .cat{font-size:11px; color:var(--muted); background:var(--bg); border-radius:999px; padding:2px 8px; white-space:nowrap}
   .prev-line{font-size:12px; color:var(--muted); padding:8px 14px 0}
   .sets{padding:8px 10px 12px}
-  .set-row{display:grid; grid-template-columns:22px 1fr 1fr 42px 30px 26px; gap:5px; align-items:center; margin-bottom:6px}
+  .set-row{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; align-items:center; margin-bottom:6px}
   .set-row .n{text-align:center; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
   .set-row input{padding:12px 8px; text-align:center; font-size:16px; font-variant-numeric:tabular-nums}
   .set-row input::placeholder{color:#4d5866}
-  .set-row .done{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:11px 0; font-size:16px; line-height:1}
+  /* 回数が入っているセット＝記録済み。緑の左線と背景で示す */
   .set-row.is-done input{border-color:#3d5a2e; background:#1b2418}
-  .set-row.is-done .done{background:var(--accent2); border-color:var(--accent2); color:#12200a}
-  .set-row .cp{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:11px 0; font-size:14px; color:var(--muted); line-height:1}
+  .set-row.is-done .n{color:var(--accent2); font-weight:700}
+  .set-row .cp{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:12px 0; font-size:14px; color:var(--muted); line-height:1}
   .set-row .cp:active{background:var(--accent); color:#07121a}
   .set-row .del{background:none; border:0; color:#5b6674; font-size:18px; padding:0}
-  .set-head{display:grid; grid-template-columns:22px 1fr 1fr 42px 30px 26px; gap:5px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
+  .set-head{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
 
   .empty{text-align:center; color:var(--muted); padding:24px 10px; font-size:13px}
@@ -477,7 +477,7 @@ function seed() {
     v: 2,
     exercises: DEFAULT_EX.map(([name, cat]) => ({ id: name, name, cat, u: '' })),
     routines: [],   // {id:name, name, exIds, u}
-    sessions: [],   // {id, date:'YYYY-MM-DD', u, entries:[{exId, sets:[{w,r,done}]}]}
+    sessions: [],   // {id, date:'YYYY-MM-DD', u, entries:[{exId, sets:[{w,r}]}]}
     tomb: { s: {}, e: {}, r: {} },   // 削除の墓標: {キー: 削除時刻ISO}
     updatedAt: '',
   };
@@ -546,14 +546,17 @@ const num = v => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
 const e1rm = (w, r) => (w > 0 && r > 0) ? w * (1 + r / 30) : 0;
 const setVol = s => num(s.w) * num(s.r);
 
+// 回数が入っていれば「実施した」とみなす。自重種目は重量0でも1セットとして数える
+const filled = s => num(s.r) > 0;
+
 function sessionVolume(sess) {
   let v = 0;
-  for (const en of sess.entries) for (const s of en.sets) if (s.done) v += setVol(s);
+  for (const en of sess.entries) for (const s of en.sets) if (filled(s)) v += setVol(s);
   return v;
 }
-function doneSets(sess) {
+function loggedSets(sess) {
   let n = 0;
-  for (const en of sess.entries) n += en.sets.filter(s => s.done).length;
+  for (const en of sess.entries) n += en.sets.filter(filled).length;
   return n;
 }
 const fmt = n => Math.round(n).toLocaleString('ja-JP');
@@ -599,7 +602,7 @@ function prevSets(exId, beforeDate) {
   for (const s of cands) {
     const en = s.entries.find(e => e.exId === exId);
     if (en) {
-      const done = en.sets.filter(x => x.done && (num(x.w) > 0 || num(x.r) > 0));
+      const done = en.sets.filter(filled);
       if (done.length) return { date: s.date, sets: done };
     }
   }
@@ -670,11 +673,10 @@ function renderLog() {
       const ro = inputMode === 'wheel' ? ' readonly' : '';
       const rows = en.sets.map((s, si) => {
         const ph = prev && prev.sets[si] ? prev.sets[si] : (prev ? prev.sets[prev.sets.length - 1] : null);
-        return '<div class="set-row' + (s.done ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
+        return '<div class="set-row' + (filled(s) ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
           '<div class="n">' + (si + 1) + '</div>' +
           '<input type="number" inputmode="decimal" step="0.1" class="in-w"' + ro + ' value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
           '<input type="number" inputmode="numeric" step="1" class="in-r"' + ro + ' value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
-          '<button class="done" data-act="done">' + (s.done ? '✓' : '○') + '</button>' +
           '<button class="cp" data-act="copydown" title="次のセットにコピー">↓</button>' +
           '<button class="del" data-act="delset">×</button>' +
         '</div>';
@@ -688,7 +690,7 @@ function renderLog() {
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + '</div>' +
         '<div class="sets">' +
-          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>完了</div><div>複製</div><div></div></div>' +
+          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>複製</div><div></div></div>' +
           rows +
         '</div>' +
         '<div class="ex-foot">' +
@@ -837,7 +839,7 @@ function renderDaySummary() {
   const sess = getSession(curDate, false);
   $('#logBar').innerHTML =
     '<div><b>' + (sess ? fmt(sessionVolume(sess)) : 0) + '</b>kg</div>' +
-    '<div><b>' + (sess ? doneSets(sess) : 0) + '</b>セット</div>' +
+    '<div><b>' + (sess ? loggedSets(sess) : 0) + '</b>セット</div>' +
     '<div><b>' + (sess ? sess.entries.length : 0) + '</b>種目</div>';
 }
 
@@ -846,7 +848,7 @@ function renderHome() {
   renderCal();
   const sess = getSession(curDate, false);
   $('#sToday').textContent = sess ? fmt(sessionVolume(sess)) : '0';
-  $('#sSets').textContent = sess ? doneSets(sess) : 0;
+  $('#sSets').textContent = sess ? loggedSets(sess) : 0;
   $('#sEx').textContent = sess ? sess.entries.length : 0;
 
   const isToday = curDate === today();
@@ -875,24 +877,6 @@ $('#logBody').addEventListener('click', e => {
   const act = btn.dataset.act;
   const sess = getSession(curDate, true);
 
-  if (act === 'done') {
-    const row = btn.closest('.set-row');
-    const en = sess.entries[+row.dataset.e];
-    const s = en.sets[+row.dataset.s];
-    // 未入力のままチェックしたら前回値／直前セットを引き継ぐ
-    if (!s.done) {
-      if (s.w === '' || s.w == null) {
-        const ph = row.querySelector('.in-w').placeholder;
-        if (ph && ph !== 'kg') s.w = ph;
-      }
-      if (s.r === '' || s.r == null) {
-        const ph = row.querySelector('.in-r').placeholder;
-        if (ph && ph !== '回') s.r = ph;
-      }
-    }
-    s.done = !s.done;
-    saveDay(); renderLog(); return;
-  }
   // ↓ その行の値を次のセットへ。最終行なら新しいセットを作って入れる
   if (act === 'copydown') {
     const row = btn.closest('.set-row');
@@ -905,27 +889,27 @@ $('#logBody').addEventListener('click', e => {
     if (w === '' && r === '') { toast('コピーする値がありません'); return; }
     const next = en.sets[si + 1];
     if (next) { next.w = w; next.r = r; }
-    else en.sets.push({ w, r, done: false });
+    else en.sets.push({ w, r });
     saveDay(); renderLog(); return;
   }
   if (act === 'delset') {
     const row = btn.closest('.set-row');
     const en = sess.entries[+row.dataset.e];
     en.sets.splice(+row.dataset.s, 1);
-    if (!en.sets.length) en.sets.push({ w: '', r: '', done: false });
+    if (!en.sets.length) en.sets.push({ w: '', r: '' });
     saveDay(); renderLog(); return;
   }
   if (act === 'addset') {
     const en = sess.entries[+btn.dataset.e];
     const last = en.sets[en.sets.length - 1];
-    en.sets.push({ w: last ? last.w : '', r: last ? last.r : '', done: false });
+    en.sets.push({ w: last ? last.w : '', r: last ? last.r : '' });
     saveDay(); renderLog(); return;
   }
   if (act === 'copyprev') {
     const en = sess.entries[+btn.dataset.e];
     const prev = prevSets(en.exId, curDate);
     if (prev) {
-      en.sets = prev.sets.map(s => ({ w: String(num(s.w)), r: String(num(s.r)), done: false }));
+      en.sets = prev.sets.map(s => ({ w: String(num(s.w)), r: String(num(s.r)), }));
       saveDay(); renderLog();
     }
     return;
@@ -1095,7 +1079,7 @@ function addExerciseToDay(exId) {
   if (sess.entries.some(en => en.exId === exId)) { toast('すでに追加済みです'); return; }
   const prev = prevSets(exId, curDate);
   const n = prev ? prev.sets.length : 3;
-  sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '', done: false })) });
+  sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '' })) });
   saveDay(); renderLog();
 }
 
@@ -1115,7 +1099,7 @@ $('#routinePick').addEventListener('change', e => {
     if (sess.entries.some(en => en.exId === exId)) continue;
     const prev = prevSets(exId, curDate);
     const n = prev ? prev.sets.length : 3;
-    sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '', done: false })) });
+    sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '' })) });
     added++;
   }
   if (!sess.entries.length) dropSession(sess.date);
@@ -1191,7 +1175,7 @@ function renderHist() {
   $('#histTitle').textContent = m + '月の記録' + (histCat ? '（' + histCat + '）' : '') + ' ' + ss.length + '件';
   $('#histBody').innerHTML = ss.length ? ss.map(s => {
     const detail = s.entries.map(en => {
-      const done = en.sets.filter(x => x.done);
+      const done = en.sets.filter(filled);
       const txt = done.length ? done.map(x => num(x.w) + '×' + num(x.r)).join(' / ') : '未完了';
       const c = CAT_COLOR[catOf(en.exId)] || '#94a3b8';
       return '<div><span style="color:' + c + '">●</span> ' + esc(exName(en.exId)) + '　' + esc(txt) + '</div>';
@@ -1201,7 +1185,7 @@ function renderHist() {
     return '<div>' +
       '<div class="list-item" data-date="' + s.date + '">' +
         '<div class="t"><b>' + s.date + '</b><span>' + cs + ' ／ ' +
-          doneSets(s) + 'セット ／ ' + fmt(sessionVolume(s)) + ' kg</span></div>' +
+          loggedSets(s) + 'セット ／ ' + fmt(sessionVolume(s)) + ' kg</span></div>' +
         '<button class="btn sm ghost" data-act="open">編集</button>' +
         '<button class="btn sm danger" data-act="del">削除</button>' +
       '</div>' +
@@ -1290,7 +1274,7 @@ function renderStats() {
 
   // 種目セレクト（記録のある種目のみ）
   const used = [];
-  for (const s of ss) for (const en of s.entries) if (!used.includes(en.exId) && en.sets.some(x => x.done)) used.push(en.exId);
+  for (const s of ss) for (const en of s.entries) if (!used.includes(en.exId) && en.sets.some(filled)) used.push(en.exId);
   const sel = $('#statEx');
   const keep = sel.value;
   sel.innerHTML = used.length
@@ -1316,7 +1300,7 @@ function renderExChart() {
   const pts = [];
   for (const s of db.sessions.slice().sort((a, b) => a.date < b.date ? -1 : 1)) {
     const en = s.entries.find(e => e.exId === exId); if (!en) continue;
-    const done = en.sets.filter(x => x.done && num(x.w) > 0 && num(x.r) > 0);
+    const done = en.sets.filter(x => filled(x) && num(x.w) > 0);
     if (!done.length) continue;
     const v = metric === 'vol' ? done.reduce((a, x) => a + setVol(x), 0)
             : metric === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
@@ -1449,7 +1433,7 @@ $('#v-ex').addEventListener('click', e => {
 function renderStorageInfo() {
   const raw = localStorage.getItem(KEY) || '';
   const days = db.sessions.length;
-  const sets = db.sessions.reduce((a, s) => a + doneSets(s), 0);
+  const sets = db.sessions.reduce((a, s) => a + loggedSets(s), 0);
   const last = db.sessions.map(s => s.date).sort().pop();
   const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
     || window.navigator.standalone === true;
