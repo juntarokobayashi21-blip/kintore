@@ -81,15 +81,17 @@
   .ex-head .cat{font-size:11px; color:var(--muted); background:var(--bg); border-radius:999px; padding:2px 8px; white-space:nowrap}
   .prev-line{font-size:12px; color:var(--muted); padding:8px 14px 0}
   .sets{padding:8px 10px 12px}
-  .set-row{display:grid; grid-template-columns:26px 1fr 1fr 44px 34px; gap:6px; align-items:center; margin-bottom:6px}
+  .set-row{display:grid; grid-template-columns:22px 1fr 1fr 42px 30px 26px; gap:5px; align-items:center; margin-bottom:6px}
   .set-row .n{text-align:center; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
   .set-row input{padding:12px 8px; text-align:center; font-size:16px; font-variant-numeric:tabular-nums}
   .set-row input::placeholder{color:#4d5866}
   .set-row .done{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:11px 0; font-size:16px; line-height:1}
   .set-row.is-done input{border-color:#3d5a2e; background:#1b2418}
   .set-row.is-done .done{background:var(--accent2); border-color:var(--accent2); color:#12200a}
+  .set-row .cp{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:11px 0; font-size:14px; color:var(--muted); line-height:1}
+  .set-row .cp:active{background:var(--accent); color:#07121a}
   .set-row .del{background:none; border:0; color:#5b6674; font-size:18px; padding:0}
-  .set-head{display:grid; grid-template-columns:26px 1fr 1fr 44px 34px; gap:6px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
+  .set-head{display:grid; grid-template-columns:22px 1fr 1fr 42px 30px 26px; gap:5px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
 
   .empty{text-align:center; color:var(--muted); padding:30px 10px; font-size:14px}
@@ -525,6 +527,7 @@ function renderLog() {
           '<input type="number" inputmode="decimal" step="0.5" class="in-w" value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
           '<input type="number" inputmode="numeric" step="1" class="in-r" value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
           '<button class="done" data-act="done">' + (s.done ? '✓' : '○') + '</button>' +
+          '<button class="cp" data-act="copydown" title="次のセットにコピー">↓</button>' +
           '<button class="del" data-act="delset">×</button>' +
         '</div>';
       }).join('');
@@ -537,7 +540,7 @@ function renderLog() {
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + '</div>' +
         '<div class="sets">' +
-          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>完了</div><div></div></div>' +
+          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>完了</div><div>複製</div><div></div></div>' +
           rows +
         '</div>' +
         '<div class="ex-foot">' +
@@ -589,6 +592,21 @@ $('#logBody').addEventListener('click', e => {
       }
     }
     s.done = !s.done;
+    saveDay(); renderLog(); return;
+  }
+  // ↓ その行の値を次のセットへ。最終行なら新しいセットを作って入れる
+  if (act === 'copydown') {
+    const row = btn.closest('.set-row');
+    const en = sess.entries[+row.dataset.e];
+    const si = +row.dataset.s;
+    const s = en.sets[si];
+    const fill = (v, ph, unit) => (v === '' || v == null) ? (ph && ph !== unit ? ph : '') : v;
+    const w = fill(s.w, row.querySelector('.in-w').placeholder, 'kg');
+    const r = fill(s.r, row.querySelector('.in-r').placeholder, '回');
+    if (w === '' && r === '') { toast('コピーする値がありません'); return; }
+    const next = en.sets[si + 1];
+    if (next) { next.w = w; next.r = r; }
+    else en.sets.push({ w, r, done: false });
     saveDay(); renderLog(); return;
   }
   if (act === 'delset') {
