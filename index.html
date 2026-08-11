@@ -229,6 +229,7 @@
     max-height:3.6em; overflow:auto;
   }
 
+  .subview{flex:1; min-height:0; display:flex; flex-direction:column}
   .chartcard{display:flex; flex-direction:column; min-height:0; flex:1}
   .chartbox{flex:1; min-height:80px; display:flex; margin-top:6px}
   svg.chart{width:100%; height:100%; display:block}
@@ -396,6 +397,36 @@
 
   <!-- ========== 分析 ========== -->
   <section class="view" id="v-stats">
+    <div class="chips" id="statTabs" style="margin:0 0 8px">
+      <button class="chip on" data-stab="train">トレーニング</button>
+      <button class="chip" data-stab="body">からだ</button>
+    </div>
+
+    <div class="subview" id="stBody" style="display:none">
+      <div class="card">
+        <div class="row" style="align-items:flex-end">
+          <div style="flex:1.1"><label class="fld">体重 (kg)</label>
+            <input type="number" inputmode="decimal" step="0.1" id="bwInput" placeholder="例 68.4"></div>
+          <div style="flex:1.3"><label class="fld">日付</label>
+            <input type="date" id="bwDate"></div>
+          <button class="btn primary" id="bwSave">記録</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="stats-grid">
+          <div class="stat"><b id="bwNow" class="gradnum">—</b><span>最新 kg</span></div>
+          <div class="stat"><b id="bwDelta">—</b><span>30日差 kg</span></div>
+          <div class="stat"><b id="bwBmi">—</b><span>BMI</span></div>
+        </div>
+        <div id="bwNote" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px"></div>
+      </div>
+      <div class="card chartcard" style="margin-bottom:0">
+        <h2>体重の推移</h2>
+        <div id="bwChart" class="chartbox"></div>
+      </div>
+    </div>
+
+    <div class="subview" id="stTrain">
     <div class="card">
       <h2>サマリー</h2>
       <div class="stats-grid">
@@ -422,6 +453,7 @@
       </div>
       <div id="exChart" class="chartbox"></div>
       <div id="exBest" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+    </div>
     </div>
   </section>
 
@@ -488,6 +520,15 @@
   <div class="backdrop" data-close></div>
   <div class="sheet">
     <h3>設定</h3>
+
+    <label class="fld">身長 (cm)</label>
+    <div class="row">
+      <input type="number" inputmode="decimal" step="0.1" id="heightInput" placeholder="例 172">
+      <button class="btn primary" id="heightSave" style="flex:0 0 auto">保存</button>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin:6px 0 16px">
+      体重を記録すると BMI を計算します。体重は「分析 → からだ」から記録できます。
+    </div>
 
     <label class="fld">アクセントカラー</label>
     <div class="swatches" id="accentList"></div>
@@ -634,7 +675,9 @@ function seed() {
     exercises: DEFAULT_EX.map(([name, cat]) => ({ id: name, name, cat, bw: BW_DEFAULT.includes(name), u: '' })),
     routines: [],   // {id:name, name, exIds, u}
     sessions: [],   // {id, date:'YYYY-MM-DD', u, entries:[{exId, sets:[{w,r}]}]}
-    tomb: { s: {}, e: {}, r: {} },   // 削除の墓標: {キー: 削除時刻ISO}
+    body: [],       // 体重の記録 {id:date, date, w, u}
+    profile: { height: '', u: '' },  // 身長は日々変わらないのでプロフィール値
+    tomb: { s: {}, e: {}, r: {}, b: {} },   // 削除の墓標: {キー: 削除時刻ISO}
     updatedAt: '',
   };
 }
@@ -655,9 +698,13 @@ if (rawBefore && JSON.stringify(db) !== rawBefore) {
 // v1（ランダムid）→ v2（名前id）への移行と、欠損フィールドの補完
 function normalize(d) {
   const s = seed();
-  for (const k of ['exercises', 'routines', 'sessions']) if (!Array.isArray(d[k])) d[k] = s[k];
-  if (!d.tomb || typeof d.tomb !== 'object') d.tomb = { s: {}, e: {}, r: {} };
-  for (const k of ['s', 'e', 'r']) if (!d.tomb[k] || typeof d.tomb[k] !== 'object') d.tomb[k] = {};
+  for (const k of ['exercises', 'routines', 'sessions', 'body']) if (!Array.isArray(d[k])) d[k] = s[k];
+  if (!d.profile || typeof d.profile !== 'object') d.profile = { height: '', u: '' };
+  d.profile.height = String(d.profile.height == null ? '' : d.profile.height);
+  if (typeof d.profile.u !== 'string') d.profile.u = '';
+  for (const b of d.body) { if (!b.id) b.id = b.date; if (!b.u) b.u = ''; }
+  if (!d.tomb || typeof d.tomb !== 'object') d.tomb = { s: {}, e: {}, r: {}, b: {} };
+  for (const k of ['s', 'e', 'r', 'b']) if (!d.tomb[k] || typeof d.tomb[k] !== 'object') d.tomb[k] = {};
   if (typeof d.updatedAt !== 'string') d.updatedAt = '';
 
   if (d.v !== 2) {
@@ -808,7 +855,7 @@ function showView(v) {
   if (v === 'home') renderHome();
   if (v === 'log') renderLog();
   if (v === 'hist') renderHist();
-  if (v === 'stats') renderStats();
+  if (v === 'stats') { if (statTab === 'body') renderBody(); else renderStats(); }
   if (v === 'ex') renderExMaster();
 }
 $$('nav button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
@@ -1500,7 +1547,7 @@ let rsTimer;
 window.addEventListener('resize', () => {
   clearTimeout(rsTimer);
   rsTimer = setTimeout(() => {
-    if (curView === 'stats') renderStats();
+    if (curView === 'stats') { if (statTab === 'body') renderBody(); else renderStats(); }
     if ($('#mChart').classList.contains('open')) renderChartSheet();
   }, 200);
 });
@@ -1543,6 +1590,7 @@ function labelMetrics(scope, bw) {
                     : { e1rm: '推定1RM', top: '最大重量', vol: 'ボリューム' };
   $$(scope).forEach(c => {
     const k = c.dataset.metric || c.dataset.cmetric;
+    if (!k) return;                       // 指標チップ以外は触らない
     c.textContent = labels[k];
     c.style.display = (bw && k === 'top') ? 'none' : '';
   });
@@ -1557,7 +1605,7 @@ function renderExChart() {
   const exId = $('#statEx').value;
   const box = $('#exChart'), best = $('#exBest');
   if (!exId) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
-  labelMetrics('#v-stats .chip', isBw(exId));
+  labelMetrics('#v-stats [data-metric]', isBw(exId));
   const pts = exPoints(exId, metric);
   drawInto(box, pts);
   best.textContent = bestLine(pts, metric, exId);
@@ -1599,6 +1647,99 @@ $$('[data-cmetric]').forEach(c => c.addEventListener('click', () => {
   chMetric = c.dataset.cmetric;
   renderChartSheet();
 }));
+
+/* ============================================================
+   からだ（身長・体重）
+============================================================ */
+const bodySorted = () => db.body.slice().sort((a, b) => a.date < b.date ? -1 : 1);
+
+function setBodyWeight(date, w) {
+  const v = num(w);
+  const i = db.body.findIndex(b => b.date === date);
+  if (!(v > 0)) {                       // 空で保存したらその日の記録を削除
+    if (i >= 0) { db.body.splice(i, 1); db.tomb.b[date] = nowISO(); }
+    return false;
+  }
+  if (i >= 0) { db.body[i].w = String(v); db.body[i].u = nowISO(); }
+  else db.body.push({ id: date, date, w: String(v), u: nowISO() });
+  delete db.tomb.b[date];
+  return true;
+}
+
+// BMI の区分（日本肥満学会の基準）
+function bmiLabel(bmi) {
+  return bmi < 18.5 ? '低体重' : bmi < 25 ? '普通体重'
+       : bmi < 30 ? '肥満(1度)' : bmi < 35 ? '肥満(2度)'
+       : bmi < 40 ? '肥満(3度)' : '肥満(4度)';
+}
+
+function renderBody() {
+  const list = bodySorted();
+  const last = list[list.length - 1];
+  const h = num(db.profile.height);
+
+  $('#bwNow').textContent = last ? num(last.w).toFixed(1) : '—';
+
+  // 30日前に最も近い記録との差
+  let delta = '—';
+  if (last && list.length > 1) {
+    const t = new Date(last.date + 'T00:00:00'); t.setDate(t.getDate() - 30);
+    const target = fmtDate(t);
+    let ref = null;
+    for (const b of list) if (b.date <= target) ref = b;
+    if (!ref) ref = list[0];
+    if (ref !== last) {
+      const d = num(last.w) - num(ref.w);
+      delta = (d > 0 ? '+' : '') + d.toFixed(1);
+    }
+  }
+  $('#bwDelta').textContent = delta;
+
+  const bmi = (last && h > 0) ? num(last.w) / Math.pow(h / 100, 2) : 0;
+  $('#bwBmi').textContent = bmi ? bmi.toFixed(1) : '—';
+  $('#bwNote').textContent = !last ? '体重を記録すると推移と BMI が出ます'
+    : !(h > 0) ? 'BMI は設定（⚙）で身長を入れると計算されます'
+    : '身長 ' + h + ' cm ・ ' + bmiLabel(bmi) + ' ・ 記録 ' + list.length + '件';
+
+  const box = $('#bwChart');
+  const pts = list.map(b => ({ label: mdLabel(b.date), date: b.date, v: num(b.w) }));
+  pts.unit = 'kg';
+  drawInto(box, pts.slice(-40));
+
+  if (!$('#bwDate').value) $('#bwDate').value = today();
+  const onDate = db.body.find(b => b.date === $('#bwDate').value);
+  $('#bwInput').value = onDate ? num(onDate.w) : '';
+}
+
+$('#bwDate').addEventListener('change', () => {
+  const onDate = db.body.find(b => b.date === $('#bwDate').value);
+  $('#bwInput').value = onDate ? num(onDate.w) : '';
+});
+$('#bwSave').addEventListener('click', () => {
+  const date = $('#bwDate').value || today();
+  const kept = setBodyWeight(date, $('#bwInput').value);
+  save(); renderBody();
+  toast(kept ? mdLabel(date) + ' の体重を記録しました' : mdLabel(date) + ' の記録を削除しました');
+});
+$('#heightSave').addEventListener('click', () => {
+  const v = num($('#heightInput').value);
+  db.profile.height = v > 0 ? String(v) : '';
+  db.profile.u = nowISO();
+  save();
+  toast(v > 0 ? '身長を保存しました' : '身長を消去しました');
+  if (curView === 'stats') renderBody();
+});
+
+// 分析タブ内の「トレーニング / からだ」切替
+let statTab = 'train';
+$('#statTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-stab]'); if (!b) return;
+  statTab = b.dataset.stab;
+  $$('#statTabs .chip').forEach(c => c.classList.toggle('on', c === b));
+  $('#stTrain').style.display = statTab === 'train' ? '' : 'none';
+  $('#stBody').style.display = statTab === 'body' ? '' : 'none';
+  if (statTab === 'body') renderBody(); else renderStats();
+});
 
 /* ---- SVG チャート（依存ライブラリなし） ----
    viewBox はコンテナの実寸から作る。固定 viewBox を非等比で引き伸ばすと
@@ -1889,6 +2030,7 @@ function mergeDb(a, b) {
     s: mergeTomb(a.tomb.s, b.tomb.s),
     e: mergeTomb(a.tomb.e, b.tomb.e),
     r: mergeTomb(a.tomb.r, b.tomb.r),
+    b: mergeTomb(a.tomb.b, b.tomb.b),
   };
   out.exercises = mergeById(a.exercises, b.exercises, out.tomb.e);
   out.routines  = mergeById(a.routines,  b.routines,  out.tomb.r);
@@ -1897,11 +2039,13 @@ function mergeDb(a, b) {
     b.sessions.map(s => ({ ...s, id: s.date })),
     out.tomb.s
   );
+  out.body = mergeById(a.body, b.body, out.tomb.b);
+  out.profile = (a.profile.u || '') >= (b.profile.u || '') ? a.profile : b.profile;
   out.updatedAt = (a.updatedAt || '') > (b.updatedAt || '') ? a.updatedAt : b.updatedAt;
   return out;
 }
 // updatedAt を除いた実データの指紋（マージで中身が変わったかの判定用）
-const fingerprint = d => JSON.stringify([d.exercises, d.routines, d.sessions, d.tomb]);
+const fingerprint = d => JSON.stringify([d.exercises, d.routines, d.sessions, d.body, d.profile, d.tomb]);
 
 function setSyncStatus(txt) {
   const el = $('#ghStatus'); if (el) el.textContent = txt;
@@ -2085,7 +2229,10 @@ function repaintTheme() {
   if ($('#mChart').classList.contains('open')) renderChartSheet();
 }
 
-$('#btnSettings').addEventListener('click', () => { renderThemePicker(); openModal('#mSettings'); });
+$('#btnSettings').addEventListener('click', () => {
+  $('#heightInput').value = num(db.profile.height) || '';
+  renderThemePicker(); openModal('#mSettings');
+});
 $('#accentList').addEventListener('click', e => {
   const b = e.target.closest('[data-accent]'); if (!b) return;
   theme.accent = b.dataset.accent; repaintTheme();
