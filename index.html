@@ -224,12 +224,24 @@
 
   .chartcard{display:flex; flex-direction:column; min-height:0; flex:1}
   .chartbox{flex:1; min-height:80px; display:flex; margin-top:6px}
-  svg.chart{width:100%; height:100%; display:block; overflow:visible}
-  svg .grid{stroke:var(--line); stroke-width:1}
-  svg .axis{fill:var(--muted); font-size:10px}
+  svg.chart{width:100%; height:100%; display:block}
+  svg .grid{stroke:#222a37; stroke-width:1}
+  svg .axis{fill:#8d99ac; font-size:11px; font-variant-numeric:tabular-nums}
+  svg .val{fill:var(--fg); font-size:13px; font-weight:800; font-variant-numeric:tabular-nums}
   svg .ln{fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round}
-  svg .pt{fill:var(--accent)}
-  svg .bar{fill:var(--accent2); opacity:.85}
+  svg .pt{fill:#0a0d13; stroke:var(--accent); stroke-width:2}
+  svg .bar{fill:#4b6b2a}
+  svg .bar.now{fill:var(--accent2)}
+
+  /* 記録が1件のときは折れ線にせず値を見せる */
+  .onept{display:flex; flex-direction:column; align-items:center; justify-content:center;
+    width:100%; text-align:center; gap:2px}
+  .onept b{font-size:34px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums;
+    background:var(--grad); -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; line-height:1.1}
+  .onept b i{font-size:14px; font-style:normal; -webkit-text-fill-color:var(--muted); margin-left:3px}
+  .onept span{font-size:12px; color:var(--fg)}
+  .onept p{font-size:11px; color:var(--muted); margin:6px 0 0}
 
   /* --- モーダル --- */
   .modal{position:fixed; inset:0; z-index:50; display:none}
@@ -1372,7 +1384,6 @@ function renderStats() {
     const w = weekStart(s.date);
     byWeek.set(w, (byWeek.get(w) || 0) + sessionVolume(s));
   }
-  const weeks = Array.from(byWeek.keys()).sort();
   const thisWeek = weekStart(today());
   $('#kWeek').textContent = fmt(byWeek.get(thisWeek) || 0);
   $('#kSess').textContent = ss.length;
@@ -1388,9 +1399,16 @@ function renderStats() {
   while (byWeek.has(cur) && byWeek.get(cur) > 0) { streak++; cur = step(cur); }
   $('#kStreak').textContent = streak;
 
-  $('#volChart').innerHTML = weeks.length
-    ? barChart(weeks.slice(-12).map(w => ({ label: mdLabel(w), v: byWeek.get(w) })))
-    : '<div class="empty">データがありません。</div>';
+  // 記録のある週だけでなく、直近8週を空の週も含めて連続で並べる
+  const wpts = [];
+  const base = new Date(thisWeek + 'T00:00:00');
+  for (let i = 7; i >= 0; i--) {
+    const d = new Date(base); d.setDate(base.getDate() - 7 * i);
+    const key = fmtDate(d);
+    wpts.push({ label: mdLabel(key), v: byWeek.get(key) || 0 });
+  }
+  const volBox = $('#volChart');
+  volBox.innerHTML = ss.length ? barChart(wpts, volBox) : '<div class="empty">データがありません。</div>';
 
   // 種目セレクト（記録のある種目のみ）
   const used = [];
@@ -1411,6 +1429,16 @@ $$('#v-stats .chip').forEach(c => c.addEventListener('click', () => {
   renderExChart();
 }));
 $('#statEx').addEventListener('change', renderExChart);
+
+// グラフはコンテナの実寸で描くので、回転やリサイズ時に描き直す
+let rsTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(rsTimer);
+  rsTimer = setTimeout(() => {
+    if (curView === 'stats') renderStats();
+    if ($('#mChart').classList.contains('open')) renderChartSheet();
+  }, 200);
+});
 
 // 種目の推移データ。分析タブと種目別グラフのシートで共用
 function exPoints(exId, mt) {
@@ -1437,7 +1465,8 @@ function bestLine(pts, mt) {
 }
 function drawInto(box, pts) {
   box.innerHTML = !pts.length ? '<div class="empty">データがありません。</div>'
-    : pts.length === 1 ? barChart(pts) : lineChart(pts.slice(-20));
+    : pts.length === 1 ? singleValue(pts[0], 'kg')
+    : lineChart(pts.slice(-20), box);
 }
 
 function renderExChart() {
@@ -1484,51 +1513,115 @@ $$('[data-cmetric]').forEach(c => c.addEventListener('click', () => {
   renderChartSheet();
 }));
 
-/* ---- SVG チャート（依存ライブラリなし） ---- */
-function scaleY(vals) {
-  const max = Math.max.apply(null, vals.concat([1]));
-  const nice = Math.pow(10, Math.floor(Math.log10(max)));
-  const top = Math.ceil(max / nice * 4) / 4 * nice;
-  return { top: top || 1 };
+/* ---- SVG チャート（依存ライブラリなし） ----
+   viewBox はコンテナの実寸から作る。固定 viewBox を非等比で引き伸ばすと
+   文字も線も歪むため。 */
+function chartSize(box) {
+  const r = box && box.getBoundingClientRect ? box.getBoundingClientRect() : null;
+  return {
+    W: r && r.width > 60 ? Math.round(r.width) : 320,
+    H: r && r.height > 60 ? Math.round(r.height) : 170,
+  };
 }
-function lineChart(pts) {
-  const W = 320, H = 160, PL = 38, PR = 8, PT = 10, PB = 22;
-  const { top } = scaleY(pts.map(p => p.v));
+function niceStep(raw) {
+  if (!(raw > 0)) return 1;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const n = raw / mag;
+  return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
+}
+// 棒グラフは0起点。折れ線は0起点だと数kgの伸びが潰れて見えないので自動範囲にする
+function axisOf(vals, fromZero) {
+  let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (fromZero) lo = 0;
+  if (hi === lo) { const d = Math.abs(hi) * 0.1 || 1; hi += d; if (!fromZero) lo -= d; }
+  else if (!fromZero) {
+    const pad = (hi - lo) * 0.18; lo -= pad; hi += pad;
+    if (lo < 0 && Math.min.apply(null, vals) >= 0) lo = 0;
+  }
+  const step = niceStep((hi - lo) / 4);
+  return { lo: Math.floor(lo / step) * step, hi: Math.ceil(hi / step) * step, step };
+}
+const axText = (v, step) => step < 1 ? v.toFixed(1) : Math.round(v).toLocaleString('ja-JP');
+const xTicks = n => {
+  const want = Math.min(n, 5);
+  if (n <= 1) return [0];
+  const out = [];
+  for (let i = 0; i < want; i++) out.push(Math.round(i * (n - 1) / (want - 1)));
+  return Array.from(new Set(out));
+};
+let gradSeq = 0;
+
+function gridAndAxis(a, PL, PR, PT, PB, W, H) {
+  const y = v => PT + (H - PT - PB) * (1 - (v - a.lo) / (a.hi - a.lo));
+  let g = '';
+  for (let v = a.lo; v <= a.hi + a.step * 1e-6; v += a.step) {
+    const gy = y(v);
+    g += '<line class="grid" x1="' + PL + '" y1="' + gy.toFixed(1) + '" x2="' + (W - PR) + '" y2="' + gy.toFixed(1) + '"/>' +
+         '<text class="axis" x="' + (PL - 7) + '" y="' + (gy + 4).toFixed(1) + '" text-anchor="end">' + axText(v, a.step) + '</text>';
+  }
+  return { g, y };
+}
+
+function lineChart(pts, box) {
+  const { W, H } = chartSize(box);
+  const PL = 46, PR = 14, PT = 18, PB = 28;
+  const a = axisOf(pts.map(p => p.v), false);
+  const { g, y } = gridAndAxis(a, PL, PR, PT, PB, W, H);
   const x = i => PL + (W - PL - PR) * (pts.length === 1 ? .5 : i / (pts.length - 1));
-  const y = v => PT + (H - PT - PB) * (1 - v / top);
-  let g = '';
-  for (let i = 0; i <= 4; i++) {
-    const gy = PT + (H - PT - PB) * i / 4;
-    g += '<line class="grid" x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '"/>' +
-         '<text class="axis" x="' + (PL - 5) + '" y="' + (gy + 3) + '" text-anchor="end">' + fmt(top * (1 - i / 4)) + '</text>';
-  }
-  const d = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
-  const dots = pts.map((p, i) => '<circle class="pt" cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="3"/>').join('');
-  const step = Math.ceil(pts.length / 6);
-  const lbl = pts.map((p, i) => (i % step === 0 || i === pts.length - 1)
-    ? '<text class="axis" x="' + x(i).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + p.label + '</text>' : '').join('');
-  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + g + '<path class="ln" d="' + d + '"/>' + dots + lbl + '</svg>';
+
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ');
+  const area = 'M' + x(0).toFixed(1) + ' ' + (H - PB) + ' ' +
+    pts.map((p, i) => 'L' + x(i).toFixed(1) + ' ' + y(p.v).toFixed(1)).join(' ') +
+    ' L' + x(pts.length - 1).toFixed(1) + ' ' + (H - PB) + ' Z';
+  const gid = 'g' + (++gradSeq);
+  const dots = pts.map((p, i) => '<circle class="pt" cx="' + x(i).toFixed(1) + '" cy="' + y(p.v).toFixed(1) + '" r="3.5"/>').join('');
+
+  // 最新値だけ数値を添える
+  const last = pts[pts.length - 1];
+  const lx = x(pts.length - 1), ly = y(last.v);
+  const tag = '<text class="val" x="' + Math.min(lx, W - PR - 4).toFixed(1) + '" y="' + Math.max(ly - 10, PT + 4).toFixed(1) +
+    '" text-anchor="' + (pts.length === 1 ? 'middle' : 'end') + '">' + axText(last.v, a.step < 1 ? 0.1 : 1) + '</text>';
+
+  const lbl = xTicks(pts.length).map(i =>
+    '<text class="axis" x="' + x(i).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="' +
+    (i === 0 ? 'start' : i === pts.length - 1 ? 'end' : 'middle') + '">' + pts[i].label + '</text>').join('');
+
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' +
+    '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
+    '<stop offset="0%" stop-color="#7dd3fc" stop-opacity=".30"/>' +
+    '<stop offset="100%" stop-color="#7dd3fc" stop-opacity="0"/></linearGradient></defs>' +
+    g + '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
+    '<path class="ln" d="' + line + '"/>' + dots + tag + lbl + '</svg>';
 }
-function barChart(pts) {
-  const W = 320, H = 160, PL = 38, PR = 8, PT = 10, PB = 22;
-  const { top } = scaleY(pts.map(p => p.v));
+
+function barChart(pts, box) {
+  const { W, H } = chartSize(box);
+  const PL = 46, PR = 14, PT = 18, PB = 28;
+  const a = axisOf(pts.map(p => p.v), true);
+  const { g, y } = gridAndAxis(a, PL, PR, PT, PB, W, H);
   const iw = (W - PL - PR) / pts.length;
-  const bw = Math.max(4, iw * 0.6);
-  let g = '';
-  for (let i = 0; i <= 4; i++) {
-    const gy = PT + (H - PT - PB) * i / 4;
-    g += '<line class="grid" x1="' + PL + '" y1="' + gy + '" x2="' + (W - PR) + '" y2="' + gy + '"/>' +
-         '<text class="axis" x="' + (PL - 5) + '" y="' + (gy + 3) + '" text-anchor="end">' + fmt(top * (1 - i / 4)) + '</text>';
-  }
+  const bw = Math.max(5, Math.min(26, iw * 0.62));
+
   const bars = pts.map((p, i) => {
     const cx = PL + iw * (i + .5);
-    const h = (H - PT - PB) * (p.v / top);
-    return '<rect class="bar" x="' + (cx - bw / 2).toFixed(1) + '" y="' + (H - PB - h).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + Math.max(0, h).toFixed(1) + '" rx="2"/>';
+    const top = y(p.v), h = Math.max(0, (H - PB) - top);
+    if (h < 0.5) return '';
+    return '<rect class="bar' + (i === pts.length - 1 ? ' now' : '') + '" x="' + (cx - bw / 2).toFixed(1) +
+      '" y="' + top.toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + h.toFixed(1) + '" rx="3"/>';
   }).join('');
-  const step = Math.ceil(pts.length / 6);
-  const lbl = pts.map((p, i) => (i % step === 0 || i === pts.length - 1)
-    ? '<text class="axis" x="' + (PL + iw * (i + .5)).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + p.label + '</text>' : '').join('');
-  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none">' + g + bars + lbl + '</svg>';
+
+  const lbl = xTicks(pts.length).map(i =>
+    '<text class="axis" x="' + (PL + iw * (i + .5)).toFixed(1) + '" y="' + (H - 8) + '" text-anchor="middle">' +
+    pts[i].label + '</text>').join('');
+
+  return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' + g + bars + lbl + '</svg>';
+}
+
+// 1件しかないときは折れ線にせず、値そのものを見せる
+function singleValue(pt, unit) {
+  return '<div class="onept"><b>' + (Math.round(pt.v * 10) / 10).toLocaleString('ja-JP') +
+    '<i>' + unit + '</i></b><span>' + esc(pt.label) + ' の記録</span>' +
+    '<p>2回以上記録すると推移グラフになります</p></div>';
 }
 
 /* ============================================================
