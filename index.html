@@ -96,6 +96,40 @@
 
   .empty{text-align:center; color:var(--muted); padding:30px 10px; font-size:14px}
 
+  /* --- カレンダー --- */
+  .cal-head{display:flex; align-items:center; gap:8px; margin-bottom:10px}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
+  .cal-grid .dow{font-size:11px; color:var(--muted); text-align:center; padding:2px 0}
+  .cal-d{
+    aspect-ratio:1; border-radius:10px; border:1px solid transparent; background:var(--panel2);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    font-size:13px; font-variant-numeric:tabular-nums; color:var(--fg); padding:0;
+  }
+  .cal-d.blank{background:transparent; pointer-events:none}
+  .cal-d .dot{width:5px; height:5px; border-radius:50%; background:transparent}
+  .cal-d.has .dot{background:var(--accent2)}
+  .cal-d.has.big .dot{width:7px; height:7px}
+  .cal-d.sun{color:#f89a9a} .cal-d.sat{color:#9ccbea}
+  .cal-d.today{border-color:var(--accent)}
+  .cal-d.sel{background:var(--accent); color:#07121a; font-weight:700; border-color:var(--accent)}
+  .cal-d.sel .dot{background:#07121a}
+
+  /* --- ホイール入力 --- */
+  .wheels{display:flex; gap:6px; justify-content:center; align-items:center; position:relative}
+  .wheel{
+    flex:0 1 110px; height:220px; overflow-y:auto; scroll-snap-type:y mandatory;
+    -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain;
+  }
+  .wheel::-webkit-scrollbar{display:none}
+  .wheel .it{height:44px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center;
+    font-size:19px; color:#6b7787; font-variant-numeric:tabular-nums; transition:color .12s}
+  .wheel .it.on{color:var(--fg); font-weight:700; font-size:25px}
+  .wheel .pad{height:88px}
+  .wheel-band{position:absolute; left:0; right:0; top:88px; height:44px; pointer-events:none;
+    border-top:1px solid var(--accent); border-bottom:1px solid var(--accent); background:rgba(125,211,252,.08)}
+  .wheel-sep{font-size:22px; color:var(--muted); align-self:center; margin-top:-4px}
+  .wheel-unit{font-size:14px; color:var(--muted); align-self:center; margin-top:-4px}
+
   /* --- 一覧・履歴 --- */
   .list-item{display:flex; align-items:center; gap:10px; padding:12px 0; border-bottom:1px solid var(--line)}
   .list-item:last-child{border-bottom:0}
@@ -154,6 +188,17 @@
   <!-- ========== 記録 ========== -->
   <section class="view active" id="v-log">
     <div class="card">
+      <div class="cal-head">
+        <button class="btn sm ghost" id="calPrev">‹</button>
+        <div id="calTitle" style="flex:1;text-align:center;font-weight:700;font-size:15px"></div>
+        <button class="btn sm ghost" id="calNext">›</button>
+      </div>
+      <div class="cal-grid" id="calDow"></div>
+      <div class="cal-grid" id="calBody"></div>
+      <div id="calSummary" style="font-size:12px;color:var(--muted);text-align:center;margin-top:10px"></div>
+    </div>
+
+    <div class="card">
       <div class="row">
         <div style="flex:1">
           <label class="fld">日付</label>
@@ -163,6 +208,11 @@
           <label class="fld">ルーティン読込</label>
           <select id="routinePick"><option value="">選択…</option></select>
         </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <span style="font-size:12px;color:var(--muted)">入力方式</span>
+        <button class="chip" data-mode="key">キーボード</button>
+        <button class="chip" data-mode="wheel">ホイール</button>
       </div>
     </div>
 
@@ -269,6 +319,19 @@
     <div class="row" style="margin-top:12px">
       <button class="btn ghost" data-close style="flex:1">キャンセル</button>
       <button class="btn primary" id="rtSave" style="flex:1">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ホイール入力 -->
+<div class="modal" id="mWheel">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3 id="whTitle"></h3>
+    <div class="wheels" id="whCols"></div>
+    <div class="row" style="margin-top:16px">
+      <button class="btn ghost" data-close style="flex:1">キャンセル</button>
+      <button class="btn primary" id="whOk" style="flex:2">決定</button>
     </div>
   </div>
 </div>
@@ -520,12 +583,13 @@ function renderLog() {
         ? '前回 ' + mdLabel(prev.date) + '：' + prev.sets.map(s => num(s.w) + 'kg×' + num(s.r)).join(' / ')
         : '前回の記録なし';
 
+      const ro = inputMode === 'wheel' ? ' readonly' : '';
       const rows = en.sets.map((s, si) => {
         const ph = prev && prev.sets[si] ? prev.sets[si] : (prev ? prev.sets[prev.sets.length - 1] : null);
         return '<div class="set-row' + (s.done ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
           '<div class="n">' + (si + 1) + '</div>' +
-          '<input type="number" inputmode="decimal" step="0.5" class="in-w" value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
-          '<input type="number" inputmode="numeric" step="1" class="in-r" value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
+          '<input type="number" inputmode="decimal" step="0.1" class="in-w"' + ro + ' value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
+          '<input type="number" inputmode="numeric" step="1" class="in-r"' + ro + ' value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
           '<button class="done" data-act="done">' + (s.done ? '✓' : '○') + '</button>' +
           '<button class="cp" data-act="copydown" title="次のセットにコピー">↓</button>' +
           '<button class="del" data-act="delset">×</button>' +
@@ -551,7 +615,69 @@ function renderLog() {
     }).join('');
   }
   renderDaySummary();
+  renderCal();
 }
+
+/* ---- カレンダー ---- */
+let calCursor = today().slice(0, 7);   // 'YYYY-MM'
+
+function renderCal() {
+  const [y, m] = calCursor.split('-').map(Number);
+  $('#calTitle').textContent = y + '年 ' + m + '月';
+  $('#calDow').innerHTML = ['日', '月', '火', '水', '木', '金', '土']
+    .map(d => '<div class="dow">' + d + '</div>').join('');
+
+  const first = new Date(y, m - 1, 1).getDay();          // 0=日
+  const days = new Date(y, m, 0).getDate();
+  const p = x => String(x).padStart(2, '0');
+  const td = today();
+
+  // その月の各日のボリュームを集計
+  const vol = {};
+  for (const s of db.sessions) {
+    if (s.date.slice(0, 7) !== calCursor) continue;
+    vol[s.date] = sessionVolume(s);
+  }
+  const vals = Object.values(vol).filter(v => v > 0);
+  const median = vals.length ? vals.slice().sort((a, b) => a - b)[Math.floor(vals.length / 2)] : 0;
+
+  let html = '';
+  for (let i = 0; i < first; i++) html += '<div class="cal-d blank"></div>';
+  for (let d = 1; d <= days; d++) {
+    const ds = y + '-' + p(m) + '-' + p(d);
+    const dow = (first + d - 1) % 7;
+    const cls = ['cal-d'];
+    if (ds in vol) cls.push('has');
+    if (vol[ds] > median && median > 0) cls.push('big');
+    if (dow === 0) cls.push('sun');
+    if (dow === 6) cls.push('sat');
+    if (ds === td) cls.push('today');
+    if (ds === curDate) cls.push('sel');
+    html += '<button class="' + cls.join(' ') + '" data-day="' + ds + '"><span>' + d + '</span><span class="dot"></span></button>';
+  }
+  $('#calBody').innerHTML = html;
+
+  const cnt = Object.keys(vol).length;
+  const total = Object.values(vol).reduce((a, b) => a + b, 0);
+  $('#calSummary').textContent = cnt
+    ? m + '月：' + cnt + '回 / 総ボリューム ' + fmt(total) + ' kg'
+    : m + '月はまだ記録がありません';
+}
+
+function shiftMonth(n) {
+  const [y, m] = calCursor.split('-').map(Number);
+  const d = new Date(y, m - 1 + n, 1);
+  calCursor = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  renderCal();
+}
+$('#calPrev').addEventListener('click', () => shiftMonth(-1));
+$('#calNext').addEventListener('click', () => shiftMonth(1));
+$('#calBody').addEventListener('click', e => {
+  const b = e.target.closest('[data-day]'); if (!b) return;
+  curDate = b.dataset.day;
+  renderLog();
+  $('#logDate').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
 
 function renderDaySummary() {
   const sess = getSession(curDate, false);
@@ -643,7 +769,117 @@ $('#logBody').addEventListener('click', e => {
 
 $('#logDate').addEventListener('change', e => {
   curDate = e.target.value || today();
+  calCursor = curDate.slice(0, 7);
   renderLog();
+});
+
+/* ---- ホイール入力 ----
+   キーボード入力とどちらを使うかは「入力方式」で切り替える。
+   ホイール時は input を readonly にしてソフトキーボードが出ないようにする。 */
+const MKEY = 'kintore.mode';
+let inputMode = localStorage.getItem(MKEY) === 'wheel' ? 'wheel' : 'key';
+
+function renderModeChips() {
+  $$('[data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === inputMode));
+}
+$$('[data-mode]').forEach(b => b.addEventListener('click', () => {
+  inputMode = b.dataset.mode;
+  localStorage.setItem(MKEY, inputMode);
+  renderModeChips(); renderLog();
+}));
+
+const ITEM_H = 44;
+let whTarget = null;   // {ei, si, kind}
+
+function makeWheel(values, curIdx) {
+  const el = document.createElement('div');
+  el.className = 'wheel';
+  el.innerHTML = '<div class="pad"></div>' +
+    values.map(v => '<div class="it">' + v + '</div>').join('') +
+    '<div class="pad"></div>';
+  el._vals = values;
+  el._idx = Math.max(0, Math.min(values.length - 1, curIdx));
+  let t;
+  el.addEventListener('scroll', () => {
+    clearTimeout(t);
+    t = setTimeout(() => {
+      const i = Math.round(el.scrollTop / ITEM_H);
+      el._idx = Math.max(0, Math.min(values.length - 1, i));
+      paintWheel(el);
+    }, 60);
+  }, { passive: true });
+  return el;
+}
+function paintWheel(el) {
+  const its = el.querySelectorAll('.it');
+  for (let i = 0; i < its.length; i++) its[i].classList.toggle('on', i === el._idx);
+}
+const wheelVal = el => el._vals[el._idx];
+
+function openWheel(inp) {
+  const row = inp.closest('.set-row');
+  const ei = +row.dataset.e, si = +row.dataset.s;
+  const kind = inp.classList.contains('in-w') ? 'w' : 'r';
+  whTarget = { ei, si, kind };
+
+  const sess = getSession(curDate, true);
+  const en = sess.entries[ei];
+  const s = en.sets[si];
+  // 空欄なら前回値（プレースホルダ）を初期位置にする
+  const raw = (s[kind] === '' || s[kind] == null) ? inp.placeholder : s[kind];
+  const cur = num(raw);
+
+  const box = $('#whCols');
+  box.innerHTML = '';
+  const cols = [];
+
+  if (kind === 'w') {
+    const ints = Array.from({ length: 301 }, (_, i) => i);          // 0〜300 kg
+    const decs = Array.from({ length: 10 }, (_, i) => i);           // 小数第1位
+    const ip = Math.floor(cur);
+    const dp = Math.round((cur - ip) * 10);
+    const a = makeWheel(ints, ip), b = makeWheel(decs, dp);
+    const sep = document.createElement('div'); sep.className = 'wheel-sep'; sep.textContent = '.';
+    const unit = document.createElement('div'); unit.className = 'wheel-unit'; unit.textContent = 'kg';
+    box.append(a, sep, b, unit);
+    cols.push(a, b);
+  } else {
+    const reps = Array.from({ length: 101 }, (_, i) => i);          // 0〜100 回
+    const a = makeWheel(reps, Math.round(cur));
+    const unit = document.createElement('div'); unit.className = 'wheel-unit'; unit.textContent = '回';
+    box.append(a, unit);
+    cols.push(a);
+  }
+  const band = document.createElement('div'); band.className = 'wheel-band';
+  box.appendChild(band);
+  box._cols = cols;
+
+  $('#whTitle').textContent = exName(en.exId) + '　' + (si + 1) + 'セット目の' + (kind === 'w' ? '重量' : '回数');
+  openModal('#mWheel');
+  // 表示後でないと scrollTop が効かない
+  requestAnimationFrame(() => cols.forEach(c => { c.scrollTop = c._idx * ITEM_H; paintWheel(c); }));
+}
+
+$('#whOk').addEventListener('click', () => {
+  if (!whTarget) return;
+  const cols = $('#whCols')._cols;
+  const sess = getSession(curDate, true);
+  const s = sess.entries[whTarget.ei].sets[whTarget.si];
+  if (whTarget.kind === 'w') {
+    const d = wheelVal(cols[1]);
+    s.w = d === 0 ? String(wheelVal(cols[0])) : wheelVal(cols[0]) + '.' + d;
+  } else {
+    s.r = String(wheelVal(cols[0]));
+  }
+  whTarget = null;
+  closeModal('#mWheel');
+  saveDay(); renderLog();
+});
+
+$('#logBody').addEventListener('click', e => {
+  if (inputMode !== 'wheel') return;
+  const inp = e.target.closest('.in-w, .in-r');
+  if (inp) openWheel(inp);
 });
 
 /* ---- 種目ピッカー ---- */
@@ -1179,6 +1415,7 @@ $('#ghGist').value = gh.gistId;
 $('#ghAuto').checked = gh.auto;
 setSyncStatus(gh.lastSync ? '前回: ' + new Date(gh.lastSync).toLocaleString('ja-JP') : '');
 
+renderModeChips();
 renderRoutinePick();
 renderLog();
 if (gh.token) syncNow(true);
