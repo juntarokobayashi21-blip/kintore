@@ -22,6 +22,7 @@
     --exh1:#1e2534; --exh2:#1a2130; --sheet1:#1a2130; --grip:#3a4459;
     --grid:#222a37; --axis:#8d99ac;
     --inset:inset 0 1px 0 rgba(255,255,255,.045);
+    --on-accent:#062231; /* アクセント上に載せる文字色（明度から自動決定） */
     --fs:1;            /* 文字サイズ倍率 */
     --lnw:2.5;         /* グラフの線の太さ */
     --bar-op:.36;      /* 棒グラフ（今週以外）の濃さ */
@@ -104,7 +105,7 @@
   }
   .btn:active{transform:scale(.97); filter:brightness(1.12)}
   .btn.primary{
-    background:var(--grad); border-color:transparent; color:#062231; font-weight:800;
+    background:var(--accent); border-color:transparent; color:var(--on-accent); font-weight:800;
     box-shadow:0 6px 18px rgba(0,0,0,.22), var(--inset);
   }
   .btn.has-memo{border-color:var(--accent2); color:var(--accent2)}
@@ -150,7 +151,7 @@
   .set-row.is-done input{border-color:var(--accent2); background:color-mix(in srgb, var(--accent2) 13%, var(--panel2))}
   .set-row.is-done .n{color:var(--accent2); font-weight:700}
   .set-row .cp{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:12px 0; font-size:calc(14px * var(--fs)); color:var(--muted); line-height:1}
-  .set-row .cp:active{background:var(--accent); color:#07121a}
+  .set-row .cp:active{background:var(--accent); color:var(--on-accent)}
   .set-row .del{background:none; border:0; color:var(--muted); font-size:calc(18px * var(--fs)); padding:0}
   .set-head{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; font-size:calc(11px * var(--fs)); color:var(--muted); padding:0 0 4px; text-align:center}
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
@@ -204,7 +205,7 @@
   /* 記録がある日の配色は部位ごとの色を JS が inline で当てる（選択日には当てない） */
   .cal-d.has{font-weight:700}
   .cal-d.today{border-color:var(--accent); color:var(--accent)}
-  .cal-d.sel{background:var(--accent); border-color:var(--accent); color:#07121a; font-weight:700}
+  .cal-d.sel{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700}
 
   /* --- ホイール入力 --- */
   .wheels{display:flex; gap:6px; justify-content:center; align-items:center; position:relative}
@@ -293,7 +294,7 @@
   .chip{background:var(--panel2); border:1px solid var(--line); border-radius:999px;
     padding:6px 13px; font-size:calc(13px * var(--fs)); box-shadow:var(--inset); transition:transform .08s}
   .chip:active{transform:scale(.95)}
-  .chip.on{background:var(--accent); border-color:var(--accent); color:#07121a; font-weight:700}
+  .chip.on{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700}
   .pick{display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line); font-size:calc(15px * var(--fs))}
   .pick .cat{font-size:calc(11px * var(--fs)); color:var(--muted)}
   .pick.sel{color:var(--accent2); font-weight:600}
@@ -1111,9 +1112,11 @@ function buildCal(cursor, opt) {
     if (it && !isSel) {
       const c = opt.cat ? CAT_COLOR[opt.cat]
               : (it.cats.length === 1 ? (CAT_COLOR[it.cats[0]] || cssVar('--accent2')) : cssVar('--accent2'));
+      // 淡色側は色そのものを文字に使うので、暗い部位カラーでは通常の文字色に逃がす
+      const soft = luminance(c) > 0.18 ? c : 'var(--fg)';
       style = (median > 0 && it.vol > median)
-        ? ' style="background:' + c + ';border-color:' + c + ';color:#07121a"'
-        : ' style="background:' + c + '33;border-color:' + c + ';color:' + c + '"';
+        ? ' style="background:' + c + ';border-color:' + c + ';color:' + readableOn(c) + '"'
+        : ' style="background:' + c + '33;border-color:' + c + ';color:' + soft + '"';
     }
     html += '<button class="' + cls.join(' ') + '"' + style + ' data-day="' + ds + '">' + d.getDate() + '</button>';
   }
@@ -1545,7 +1548,7 @@ function renderHist() {
     .map(([v, label]) => {
       const col = v ? CAT_COLOR[v] : '';
       const on = histCat === v;
-      const st = (on && col) ? ' style="background:' + col + ';border-color:' + col + ';color:#07121a"'
+      const st = (on && col) ? ' style="background:' + col + ';border-color:' + col + ';color:' + readableOn(col) + '"'
                : (col ? ' style="border-color:' + col + '55;color:' + col + '"' : '');
       return '<button class="chip' + (on ? ' on' : '') + '"' + st + ' data-hcat="' + esc(v) + '">' + esc(label) + '</button>';
     }).join('');
@@ -2385,6 +2388,23 @@ if (!SIZES[theme.size]) theme.size = 'm';
 if (!theme.custom || typeof theme.custom !== 'object') theme.custom = { a: '#7dd3fc', b: '#a3e635' };
 if (!theme.cats || typeof theme.cats !== 'object') theme.cats = {};
 
+// 背景色の上に載せる文字色を、コントラスト比（WCAG）が高い方で選ぶ。
+// 固定のしきい値だと中間の明るさで判断を誤るため、実際の比を比べる。
+const DARK_INK = '#0b1016';
+function luminance(hex) {
+  const v = i => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * v(1) + 0.7152 * v(3) + 0.0722 * v(5);
+}
+function readableOn(hex) {
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex || '')) return DARK_INK;
+  const L = luminance(hex), Ld = luminance(DARK_INK);
+  const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  return ratio(L, 1) > ratio(L, Ld) ? '#ffffff' : DARK_INK;
+}
+
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
 // 2色の中間を求めてグラデーションの中継点にする
@@ -2415,6 +2435,7 @@ function applyTheme() {
   root.setProperty('--accent', a.a);
   root.setProperty('--accent2', a.b);
   root.setProperty('--grad', 'linear-gradient(135deg,' + a.a + ' 0%,' + a.mid + ' 45%,' + a.b + ' 100%)');
+  root.setProperty('--on-accent', readableOn(a.a));
 
   // 部位カラーは既定に上書きを重ねる
   for (const k in CAT_DEFAULT) CAT_COLOR[k] = theme.cats[k] || CAT_DEFAULT[k];
