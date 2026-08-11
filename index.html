@@ -434,7 +434,8 @@
 
     <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
 
-    <h3 style="font-size:14px">ローカルのバックアップ</h3>
+    <h3 style="font-size:14px">この端末の保存状況</h3>
+    <div id="stInfo" style="font-size:12px;color:var(--muted);line-height:1.7;margin-bottom:12px"></div>
     <button class="btn primary block" id="btnExport">JSONを書き出す</button>
     <label class="fld" style="margin-top:14px">JSONを読み込む（現在のデータを置き換え）</label>
     <input type="file" id="fileImport" accept="application/json">
@@ -488,7 +489,12 @@ try {
 } catch (e) {
   db = seed();
 }
+const rawBefore = localStorage.getItem(KEY);
 db = normalize(db);
+// 移行結果はその場で書き戻す（次回起動で毎回やり直さないため）
+if (rawBefore && JSON.stringify(db) !== rawBefore) {
+  try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) {}
+}
 
 // v1（ランダムid）→ v2（名前id）への移行と、欠損フィールドの補完
 function normalize(d) {
@@ -1437,7 +1443,25 @@ $('#v-ex').addEventListener('click', e => {
 /* ============================================================
    バックアップ
 ============================================================ */
-$('#btnBackup').addEventListener('click', () => openModal('#mBackup'));
+// localStorage はオリジン（URL）ごとに分かれる。file:// と https:// 、
+// iOS のホーム画面アイコンと Safari 本体でも別枠になることがあるため、
+// 「どこに保存されているか」を判別できるようにしておく。
+function renderStorageInfo() {
+  const raw = localStorage.getItem(KEY) || '';
+  const days = db.sessions.length;
+  const sets = db.sessions.reduce((a, s) => a + doneSets(s), 0);
+  const last = db.sessions.map(s => s.date).sort().pop();
+  const standalone = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone === true;
+  $('#stInfo').innerHTML =
+    '記録：<b style="color:var(--fg)">' + days + '日分</b>（完了 ' + sets + 'セット）' +
+    (last ? '　最終記録：' + last : '') + '<br>' +
+    '保存サイズ：' + (raw.length / 1024).toFixed(1) + ' KB<br>' +
+    '保存先：<span style="color:var(--fg)">' + esc(location.origin === 'null' ? 'ローカルファイル' : location.origin) + '</span>' +
+    (standalone ? '（ホーム画面から起動）' : '（ブラウザから起動）') + '<br>' +
+    '<span style="color:var(--danger)">保存先が変わると記録は別枠になります。</span>';
+}
+$('#btnBackup').addEventListener('click', () => { renderStorageInfo(); openModal('#mBackup'); });
 $('#btnExport').addEventListener('click', () => {
   const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
   const a = document.createElement('a');
