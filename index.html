@@ -97,35 +97,35 @@
   .empty{text-align:center; color:var(--muted); padding:30px 10px; font-size:14px}
 
   /* --- カレンダー --- */
-  .cal-head{display:flex; align-items:center; gap:8px; margin-bottom:10px}
-  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px}
-  .cal-grid .dow{font-size:11px; color:var(--muted); text-align:center; padding:2px 0}
+  .cal-head{display:flex; align-items:center; gap:8px; margin-bottom:6px}
+  .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px; justify-items:center}
+  .cal-grid .dow{font-size:10px; color:var(--muted); text-align:center; padding:1px 0; letter-spacing:.04em}
   .cal-d{
-    aspect-ratio:1; border-radius:10px; border:1px solid transparent; background:var(--panel2);
-    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
-    font-size:13px; font-variant-numeric:tabular-nums; color:var(--fg); padding:0;
+    width:32px; height:32px; border-radius:50%; border:1px solid transparent; background:transparent;
+    display:flex; align-items:center; justify-content:center; padding:0;
+    font-size:13px; font-variant-numeric:tabular-nums; color:var(--fg);
   }
-  .cal-d.blank{background:transparent; pointer-events:none}
-  .cal-d .dot{width:5px; height:5px; border-radius:50%; background:transparent}
-  .cal-d.has .dot{background:var(--accent2)}
-  .cal-d.has.big .dot{width:7px; height:7px}
-  .cal-d.sun{color:#f89a9a} .cal-d.sat{color:#9ccbea}
-  .cal-d.today{border-color:var(--accent)}
-  .cal-d.sel{background:var(--accent); color:#07121a; font-weight:700; border-color:var(--accent)}
-  .cal-d.sel .dot{background:#07121a}
+  .cal-d.other{color:#4b5563}
+  .cal-d.sun{color:#e08a8a} .cal-d.sat{color:#8fb6d4}
+  .cal-d.other.sun,.cal-d.other.sat{color:#4b5563}
+  .cal-d.has{background:rgba(163,230,53,.15); border-color:var(--accent2); color:var(--accent2); font-weight:600}
+  .cal-d.has.big{background:rgba(163,230,53,.38)}
+  .cal-d.today{border-color:var(--accent); color:var(--accent)}
+  .cal-d.sel{background:var(--accent); border-color:var(--accent); color:#07121a; font-weight:700}
 
   /* --- ホイール入力 --- */
   .wheels{display:flex; gap:6px; justify-content:center; align-items:center; position:relative}
+  /* snap は proximity。mandatory だと慣性スクロールが強く減衰して弾いても進まない */
   .wheel{
-    flex:0 1 110px; height:220px; overflow-y:auto; scroll-snap-type:y mandatory;
+    flex:0 1 110px; height:204px; overflow-y:auto; scroll-snap-type:y proximity;
     -webkit-overflow-scrolling:touch; scrollbar-width:none; overscroll-behavior:contain;
   }
   .wheel::-webkit-scrollbar{display:none}
-  .wheel .it{height:44px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center;
-    font-size:19px; color:#6b7787; font-variant-numeric:tabular-nums; transition:color .12s}
-  .wheel .it.on{color:var(--fg); font-weight:700; font-size:25px}
-  .wheel .pad{height:88px}
-  .wheel-band{position:absolute; left:0; right:0; top:88px; height:44px; pointer-events:none;
+  .wheel .it{height:34px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center;
+    font-size:17px; color:#6b7787; font-variant-numeric:tabular-nums; transition:color .12s}
+  .wheel .it.on{color:var(--fg); font-weight:700; font-size:23px}
+  .wheel .pad{height:85px}
+  .wheel-band{position:absolute; left:0; right:0; top:85px; height:34px; pointer-events:none;
     border-top:1px solid var(--accent); border-bottom:1px solid var(--accent); background:rgba(125,211,252,.08)}
   .wheel-sep{font-size:22px; color:var(--muted); align-self:center; margin-top:-4px}
   .wheel-unit{font-size:14px; color:var(--muted); align-self:center; margin-top:-4px}
@@ -630,9 +630,10 @@ function renderCal() {
   const first = new Date(y, m - 1, 1).getDay();          // 0=日
   const days = new Date(y, m, 0).getDate();
   const p = x => String(x).padStart(2, '0');
+  const fmtD = d => d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
   const td = today();
 
-  // その月の各日のボリュームを集計
+  // 表示中の月の各日のボリューム。強度の色分けは中央値を境にする
   const vol = {};
   for (const s of db.sessions) {
     if (s.date.slice(0, 7) !== calCursor) continue;
@@ -641,19 +642,26 @@ function renderCal() {
   const vals = Object.values(vol).filter(v => v > 0);
   const median = vals.length ? vals.slice().sort((a, b) => a - b)[Math.floor(vals.length / 2)] : 0;
 
+  // 前後の月の日で先頭と末尾の週を埋める
+  const trail = (7 - (first + days) % 7) % 7;
+  const cells = first + days + trail;
+  const start = new Date(y, m - 1, 1 - first);
+
   let html = '';
-  for (let i = 0; i < first; i++) html += '<div class="cal-d blank"></div>';
-  for (let d = 1; d <= days; d++) {
-    const ds = y + '-' + p(m) + '-' + p(d);
-    const dow = (first + d - 1) % 7;
+  for (let i = 0; i < cells; i++) {
+    const d = new Date(start); d.setDate(start.getDate() + i);
+    const ds = fmtD(d);
     const cls = ['cal-d'];
-    if (ds in vol) cls.push('has');
-    if (vol[ds] > median && median > 0) cls.push('big');
-    if (dow === 0) cls.push('sun');
-    if (dow === 6) cls.push('sat');
+    if (d.getMonth() !== m - 1) cls.push('other');
+    else {
+      if (ds in vol) cls.push('has');
+      if (vol[ds] > median && median > 0) cls.push('big');
+    }
+    if (d.getDay() === 0) cls.push('sun');
+    if (d.getDay() === 6) cls.push('sat');
     if (ds === td) cls.push('today');
     if (ds === curDate) cls.push('sel');
-    html += '<button class="' + cls.join(' ') + '" data-day="' + ds + '"><span>' + d + '</span><span class="dot"></span></button>';
+    html += '<button class="' + cls.join(' ') + '" data-day="' + ds + '">' + d.getDate() + '</button>';
   }
   $('#calBody').innerHTML = html;
 
@@ -675,6 +683,7 @@ $('#calNext').addEventListener('click', () => shiftMonth(1));
 $('#calBody').addEventListener('click', e => {
   const b = e.target.closest('[data-day]'); if (!b) return;
   curDate = b.dataset.day;
+  calCursor = curDate.slice(0, 7);   // 前後の月の日を押したらその月へ移動
   renderLog();
   $('#logDate').scrollIntoView({ behavior: 'smooth', block: 'start' });
 });
@@ -788,7 +797,7 @@ $$('[data-mode]').forEach(b => b.addEventListener('click', () => {
   renderModeChips(); renderLog();
 }));
 
-const ITEM_H = 44;
+const ITEM_H = 34;
 let whTarget = null;   // {ei, si, kind}
 
 function makeWheel(values, curIdx) {
@@ -806,7 +815,10 @@ function makeWheel(values, curIdx) {
       const i = Math.round(el.scrollTop / ITEM_H);
       el._idx = Math.max(0, Math.min(values.length - 1, i));
       paintWheel(el);
-    }, 60);
+      // proximity snap は途中で止まることがあるので、静止後に自分で中央へ寄せる
+      const want = el._idx * ITEM_H;
+      if (Math.abs(el.scrollTop - want) > 1) el.scrollTo({ top: want, behavior: 'smooth' });
+    }, 70);
   }, { passive: true });
   return el;
 }
