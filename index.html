@@ -7,10 +7,15 @@
 <title>筋トレ記録</title>
 <style>
   :root{
-    --bg:#0e1116; --panel:#171c24; --panel2:#1f2630; --line:#2a323e;
-    --fg:#e8edf4; --muted:#8b97a8; --accent:#7dd3fc; --accent2:#a3e635;
-    --danger:#f87171; --radius:14px;
+    --bg:#0a0d13; --panel:#141924; --panel2:#1b2130; --line:#252d3d;
+    --fg:#e9eef7; --muted:#7e8a9e; --accent:#7dd3fc; --accent2:#a3e635;
+    --danger:#f87171; --radius:16px;
+    --grad:linear-gradient(135deg,#7dd3fc 0%,#a5f3fc 45%,#a3e635 100%);
+    --inset:inset 0 1px 0 rgba(255,255,255,.045);
   }
+  /* 主要な数値はグラデーションで抜く */
+  .gradnum{background:var(--grad); -webkit-background-clip:text; background-clip:text;
+    -webkit-text-fill-color:transparent; color:transparent}
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0;padding:0}
   /* 画面全体は固定。スクロールが要る部分だけ .scroll が内側で持つ */
@@ -25,12 +30,13 @@
   button{cursor:pointer}
 
   header{
-    flex:0 0 auto; z-index:20; background:var(--bg);
+    flex:0 0 auto; z-index:20;
+    background:linear-gradient(180deg,#111725 0%,var(--bg) 100%);
     border-bottom:1px solid var(--line);
     padding:8px 12px; padding-top:calc(8px + env(safe-area-inset-top));
     display:flex; align-items:center; gap:8px;
   }
-  header h1{font-size:16px; margin:0; font-weight:700; letter-spacing:.02em}
+  header h1{font-size:16px; margin:0; font-weight:800; letter-spacing:.03em}
   header .spacer{flex:1}
 
   main{
@@ -45,28 +51,44 @@
   nav{
     flex:0 0 auto; z-index:30;
     display:grid; grid-template-columns:repeat(4,1fr);
-    background:var(--panel); border-top:1px solid var(--line);
+    background:linear-gradient(180deg,#161c29,#10141d);
+    border-top:1px solid var(--line);
     padding-bottom:env(safe-area-inset-bottom);
   }
   nav button{
-    background:none; border:0; color:var(--muted);
+    position:relative; background:none; border:0; color:var(--muted);
     padding:7px 4px 8px; font-size:10px; display:flex;
-    flex-direction:column; align-items:center; gap:2px;
+    flex-direction:column; align-items:center; gap:2px; letter-spacing:.02em;
   }
-  nav button .ic{font-size:18px; line-height:1}
+  nav button .ic{font-size:18px; line-height:1; opacity:.65; transition:opacity .15s}
   nav button.active{color:var(--accent)}
+  nav button.active .ic{opacity:1}
+  /* 選択中のタブに上部インジケータ */
+  nav button.active::before{
+    content:''; position:absolute; top:0; left:26%; right:26%; height:2px;
+    background:var(--grad); border-radius:0 0 2px 2px;
+  }
 
-  .card{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:12px; margin-bottom:8px}
+  .card{
+    background:linear-gradient(180deg,#171d2a 0%,#131824 100%);
+    border:1px solid var(--line); border-radius:var(--radius);
+    padding:12px; margin-bottom:8px; box-shadow:var(--inset);
+  }
   .card:last-child{margin-bottom:0}
   .card h2{font-size:13px; margin:0 0 8px; color:var(--muted); font-weight:600; letter-spacing:.04em}
 
   .row{display:flex; align-items:center; gap:8px}
   .btn{
     background:var(--panel2); border:1px solid var(--line); color:var(--fg);
-    border-radius:10px; padding:10px 14px; font-size:14px; font-weight:600;
+    border-radius:11px; padding:10px 14px; font-size:14px; font-weight:600;
+    transition:transform .08s, filter .15s; box-shadow:var(--inset);
   }
-  .btn:active{transform:scale(.97)}
-  .btn.primary{background:var(--accent); border-color:var(--accent); color:#07121a}
+  .btn:active{transform:scale(.97); filter:brightness(1.12)}
+  .btn.primary{
+    background:var(--grad); border-color:transparent; color:#062231; font-weight:800;
+    box-shadow:0 6px 18px rgba(125,211,252,.18), var(--inset);
+  }
+  .btn.has-memo{border-color:var(--accent2); color:var(--accent2)}
   .btn.ghost{background:transparent}
   .btn.danger{color:var(--danger); border-color:#4a2a2e}
   .btn.block{width:100%; justify-content:center; display:flex}
@@ -75,14 +97,22 @@
 
   input[type=text],input[type=date],input[type=number],select,textarea{
     background:var(--panel2); border:1px solid var(--line); color:var(--fg);
-    border-radius:10px; padding:10px 12px; width:100%; outline:none;
+    border-radius:11px; padding:10px 12px; width:100%; outline:none;
+    transition:border-color .15s, box-shadow .15s;
   }
-  input:focus,select:focus{border-color:var(--accent)}
+  input:focus,select:focus,textarea:focus{
+    border-color:var(--accent); box-shadow:0 0 0 3px rgba(125,211,252,.13);
+  }
+  textarea{resize:vertical; font-size:15px; line-height:1.6}
   label.fld{display:block; font-size:12px; color:var(--muted); margin:0 0 4px}
 
   /* --- 記録 --- */
-  .ex-block{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); margin-bottom:12px; overflow:hidden}
-  .ex-head{display:flex; align-items:center; gap:8px; padding:12px 14px; border-bottom:1px solid var(--line); background:var(--panel2)}
+  .ex-block{
+    background:linear-gradient(180deg,#171d2a,#131824); border:1px solid var(--line);
+    border-radius:var(--radius); margin-bottom:10px; overflow:hidden; box-shadow:var(--inset);
+  }
+  .ex-head{display:flex; align-items:center; gap:6px; padding:10px 12px;
+    border-bottom:1px solid var(--line); background:linear-gradient(180deg,#1e2534,#1a2130)}
   .ex-head .name{font-weight:700; font-size:15px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .ex-head .cat{font-size:11px; color:var(--muted); background:var(--bg); border-radius:999px; padding:2px 8px; white-space:nowrap}
   .prev-line{font-size:12px; color:var(--muted); padding:8px 14px 0}
@@ -120,10 +150,13 @@
   .arch span{margin-right:2px}
 
   .hero-stats{min-width:0}
-  .tile{background:var(--panel2); border:1px solid var(--line); border-radius:10px; padding:8px 9px; margin-bottom:6px}
-  .tile > span{font-size:10px; color:var(--muted); display:block; line-height:1.3}
-  .tile > b{font-size:19px; font-variant-numeric:tabular-nums; display:block; margin-top:1px}
-  .tile > b i{font-size:11px; font-style:normal; color:var(--muted); margin-left:2px}
+  .tile{background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+    padding:8px 10px; margin-bottom:6px; box-shadow:var(--inset)}
+  .tile > span{font-size:9.5px; color:var(--muted); display:block; line-height:1.3; letter-spacing:.03em}
+  .tile > b{font-size:21px; font-weight:800; font-variant-numeric:tabular-nums;
+    display:block; margin-top:1px; letter-spacing:-.02em}
+  .tile > b i{font-size:11px; font-style:normal; color:var(--muted); margin-left:2px;
+    -webkit-text-fill-color:var(--muted)}
   .wbars{margin-top:7px; display:grid; gap:3px}
   .wbar{display:grid; grid-template-columns:30px 1fr; gap:4px; align-items:center; font-size:9px; color:var(--muted)}
   .wbar .t{height:6px; background:var(--line); border-radius:3px; overflow:hidden}
@@ -176,9 +209,18 @@
   .hist-detail div{padding:3px 0}
 
   .stats-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
-  .stat{background:var(--panel2); border:1px solid var(--line); border-radius:12px; padding:12px 8px; text-align:center}
-  .stat b{display:block; font-size:20px; font-variant-numeric:tabular-nums}
-  .stat span{font-size:11px; color:var(--muted)}
+  .stat{background:var(--panel2); border:1px solid var(--line); border-radius:12px;
+    padding:11px 6px; text-align:center; box-shadow:var(--inset)}
+  .stat b{display:block; font-size:21px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.01em}
+  .stat span{font-size:10px; color:var(--muted)}
+
+  /* メモ行 */
+  .memoline{
+    font-size:12px; color:#b6c2d4; background:rgba(163,230,53,.07);
+    border-left:2px solid var(--accent2); border-radius:0 8px 8px 0;
+    padding:6px 10px; margin-bottom:6px; white-space:pre-wrap; word-break:break-word;
+    max-height:3.6em; overflow:auto;
+  }
 
   .chartcard{display:flex; flex-direction:column; min-height:0; flex:1}
   .chartbox{flex:1; min-height:80px; display:flex; margin-top:6px}
@@ -193,15 +235,27 @@
   .modal{position:fixed; inset:0; z-index:50; display:none}
   .modal.open{display:block}
   .modal .backdrop{position:absolute; inset:0; background:rgba(0,0,0,.6)}
+  .modal .backdrop{backdrop-filter:blur(2px)}
   .modal .sheet{
-    position:absolute; left:0; right:0; bottom:0; max-height:86vh; overflow:auto;
-    background:var(--panel); border-radius:18px 18px 0 0; border-top:1px solid var(--line);
-    padding:16px 14px calc(16px + env(safe-area-inset-bottom));
+    position:absolute; left:0; right:0; bottom:0; max-height:88vh; overflow:auto;
+    background:linear-gradient(180deg,#1a2130 0%,#12172200 60%), var(--panel);
+    border-radius:20px 20px 0 0; border-top:1px solid #333d50;
+    padding:14px 14px calc(16px + env(safe-area-inset-bottom));
+    box-shadow:0 -14px 40px rgba(0,0,0,.5);
+    animation:sheetUp .22s cubic-bezier(.2,.9,.3,1);
   }
-  .modal .sheet h3{margin:0 0 12px; font-size:16px}
+  @keyframes sheetUp{from{transform:translateY(14px); opacity:.4} to{transform:none; opacity:1}}
+  /* シート上部のつまみ */
+  .modal .sheet::before{
+    content:''; display:block; width:38px; height:4px; border-radius:2px;
+    background:#3a4459; margin:0 auto 12px;
+  }
+  .modal .sheet h3{margin:0 0 12px; font-size:16px; font-weight:700}
   .chips{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0}
-  .chip{background:var(--panel2); border:1px solid var(--line); border-radius:999px; padding:6px 12px; font-size:13px}
-  .chip.on{background:var(--accent); border-color:var(--accent); color:#07121a; font-weight:600}
+  .chip{background:var(--panel2); border:1px solid var(--line); border-radius:999px;
+    padding:6px 13px; font-size:13px; box-shadow:var(--inset); transition:transform .08s}
+  .chip:active{transform:scale(.95)}
+  .chip.on{background:var(--accent); border-color:var(--accent); color:#07121a; font-weight:700}
   .pick{display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line); font-size:15px}
   .pick .cat{font-size:11px; color:var(--muted)}
   .pick.sel{color:var(--accent2); font-weight:600}
@@ -242,11 +296,11 @@
       <div class="hero-stats">
         <div class="tile">
           <span>合計負荷量 / 7日間</span>
-          <b id="k7">0.00<i>t</i></b>
+          <b id="k7" class="gradnum">0.00<i>t</i></b>
           <div class="wbars" id="wbars"></div>
         </div>
-        <div class="tile"><span>合計負荷量 / 28日間</span><b id="k28">0.00<i>t</i></b></div>
-        <div class="tile" style="margin-bottom:0"><span>総合計負荷量</span><b id="kAll">0.00<i>t</i></b></div>
+        <div class="tile"><span>合計負荷量 / 28日間</span><b id="k28" class="gradnum">0.00<i>t</i></b></div>
+        <div class="tile" style="margin-bottom:0"><span>総合計負荷量</span><b id="kAll" class="gradnum">0.00<i>t</i></b></div>
       </div>
     </div>
 
@@ -282,8 +336,12 @@
 
     <div class="scroll" id="logBody"></div>
 
+    <div class="memoline" id="logMemo"></div>
     <div class="daybar" id="logBar"></div>
-    <button class="btn primary block lg" id="btnAddEx">＋ 種目を追加</button>
+    <div class="row">
+      <button class="btn lg" id="btnMemo" style="flex:0 0 52px">📝</button>
+      <button class="btn primary lg" id="btnAddEx" style="flex:1">＋ 種目を追加</button>
+    </div>
   </section>
 
   <!-- ========== 履歴 ========== -->
@@ -388,6 +446,36 @@
       <button class="btn ghost" data-close style="flex:1">キャンセル</button>
       <button class="btn primary" id="rtSave" style="flex:1">保存</button>
     </div>
+  </div>
+</div>
+
+<!-- メモ -->
+<div class="modal" id="mMemo">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3 id="memoTitle">メモ</h3>
+    <textarea id="memoText" rows="5" placeholder="体調、フォームの気づき、次回やること など"></textarea>
+    <div class="row" style="margin-top:12px">
+      <button class="btn ghost" data-close style="flex:1">キャンセル</button>
+      <button class="btn primary" id="memoSave" style="flex:2">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- 種目別グラフ -->
+<div class="modal" id="mChart">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3 id="chTitle">推移</h3>
+    <div class="chips" style="margin-top:0">
+      <button class="chip on" data-cmetric="e1rm">推定1RM</button>
+      <button class="chip" data-cmetric="top">最大重量</button>
+      <button class="chip" data-cmetric="vol">ボリューム</button>
+    </div>
+    <div id="chBox" style="height:170px;display:flex"></div>
+    <div id="chBest" style="font-size:12px;color:var(--muted);margin:6px 0 10px"></div>
+    <div id="chList" style="max-height:34vh;overflow-y:auto"></div>
+    <button class="btn block ghost" data-close style="margin-top:12px">閉じる</button>
   </div>
 </div>
 
@@ -677,7 +765,7 @@ function renderLog() {
           '<div class="n">' + (si + 1) + '</div>' +
           '<input type="number" inputmode="decimal" step="0.1" class="in-w"' + ro + ' value="' + (s.w === '' || s.w == null ? '' : s.w) + '" placeholder="' + (ph ? num(ph.w) : 'kg') + '">' +
           '<input type="number" inputmode="numeric" step="1" class="in-r"' + ro + ' value="' + (s.r === '' || s.r == null ? '' : s.r) + '" placeholder="' + (ph ? num(ph.r) : '回') + '">' +
-          '<button class="cp" data-act="copydown" title="次のセットにコピー">↓</button>' +
+          '<button class="cp" data-act="copydown" title="同じ内容で次のセット">↪</button>' +
           '<button class="del" data-act="delset">×</button>' +
         '</div>';
       }).join('');
@@ -686,11 +774,12 @@ function renderLog() {
         '<div class="ex-head">' +
           '<div class="name">' + esc(ex.name) + '</div>' +
           (ex.cat ? '<div class="cat">' + esc(ex.cat) + '</div>' : '') +
-          '<button class="btn sm ghost" data-act="delex" data-e="' + ei + '">削除</button>' +
+          '<button class="btn sm ghost" data-act="chart" data-e="' + ei + '" title="推移を見る">📈</button>' +
+          '<button class="btn sm ghost" data-act="delex" data-e="' + ei + '">✕</button>' +
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + '</div>' +
         '<div class="sets">' +
-          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>複製</div><div></div></div>' +
+          '<div class="set-head"><div></div><div>重量(kg)</div><div>回数</div><div>追加</div><div></div></div>' +
           rows +
         '</div>' +
         '<div class="ex-foot">' +
@@ -727,6 +816,7 @@ function buildCal(cursor, opt) {
   const info = {};
   for (const s of db.sessions) {
     if (s.date.slice(0, 7) !== cursor) continue;
+    if (!s.entries.length) continue;          // メモだけの日はトレーニング日として塗らない
     const cats = sessionCats(s);
     if (opt.cat && !cats.has(opt.cat)) continue;
     info[s.date] = { vol: sessionVolume(s), cats: Array.from(cats) };
@@ -837,11 +927,36 @@ $('#calBody').addEventListener('click', e => {
 // 記録ページ下部の1行サマリー
 function renderDaySummary() {
   const sess = getSession(curDate, false);
+  const memo = sess && sess.memo ? sess.memo : '';
   $('#logBar').innerHTML =
     '<div><b>' + (sess ? fmt(sessionVolume(sess)) : 0) + '</b>kg</div>' +
     '<div><b>' + (sess ? loggedSets(sess) : 0) + '</b>セット</div>' +
     '<div><b>' + (sess ? sess.entries.length : 0) + '</b>種目</div>';
+  $('#btnMemo').classList.toggle('has-memo', !!memo);
+  const ml = $('#logMemo');
+  ml.textContent = memo;
+  ml.style.display = memo ? '' : 'none';
 }
+
+/* ---- メモ ---- */
+$('#btnMemo').addEventListener('click', () => {
+  const sess = getSession(curDate, false);
+  $('#memoTitle').textContent = mdLabel(curDate) + ' のメモ';
+  $('#memoText').value = sess && sess.memo ? sess.memo : '';
+  openModal('#mMemo');
+});
+$('#memoSave').addEventListener('click', () => {
+  const txt = $('#memoText').value.trim();
+  const sess = getSession(curDate, !!txt);   // 空メモのために空セッションは作らない
+  if (sess) {
+    if (txt) sess.memo = txt; else delete sess.memo;
+    if (!sess.entries.length && !sess.memo) dropSession(sess.date);
+    saveDay();
+  }
+  closeModal('#mMemo');
+  renderLog();
+  toast(txt ? 'メモを保存しました' : 'メモを削除しました');
+});
 
 /* ---- ホーム ---- */
 function renderHome() {
@@ -912,6 +1027,10 @@ $('#logBody').addEventListener('click', e => {
       en.sets = prev.sets.map(s => ({ w: String(num(s.w)), r: String(num(s.r)), }));
       saveDay(); renderLog();
     }
+    return;
+  }
+  if (act === 'chart') {
+    openExChart(sess.entries[+btn.dataset.e].exId);
     return;
   }
   if (act === 'delex') {
@@ -1182,14 +1301,15 @@ function renderHist() {
     }).join('');
     const cs = Array.from(sessionCats(s))
       .map(c => '<span style="color:' + (CAT_COLOR[c] || '#94a3b8') + '">' + esc(c) + '</span>').join(' ');
+    const memo = s.memo ? '<div class="memoline" style="margin:6px 0 0">' + esc(s.memo) + '</div>' : '';
     return '<div>' +
       '<div class="list-item" data-date="' + s.date + '">' +
-        '<div class="t"><b>' + s.date + '</b><span>' + cs + ' ／ ' +
+        '<div class="t"><b>' + s.date + (s.memo ? ' 📝' : '') + '</b><span>' + cs + ' ／ ' +
           loggedSets(s) + 'セット ／ ' + fmt(sessionVolume(s)) + ' kg</span></div>' +
         '<button class="btn sm ghost" data-act="open">編集</button>' +
         '<button class="btn sm danger" data-act="del">削除</button>' +
       '</div>' +
-      '<div class="hist-detail" id="hd-' + s.date + '">' + detail + '</div>' +
+      '<div class="hist-detail" id="hd-' + s.date + '">' + detail + memo + '</div>' +
     '</div>';
   }).join('') : '<div class="empty">該当する記録がありません。</div>';
 }
@@ -1292,31 +1412,77 @@ $$('#v-stats .chip').forEach(c => c.addEventListener('click', () => {
 }));
 $('#statEx').addEventListener('change', renderExChart);
 
-function renderExChart() {
-  const exId = $('#statEx').value;
-  const box = $('#exChart'), best = $('#exBest');
-  if (!exId) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
-
+// 種目の推移データ。分析タブと種目別グラフのシートで共用
+function exPoints(exId, mt) {
   const pts = [];
   for (const s of db.sessions.slice().sort((a, b) => a.date < b.date ? -1 : 1)) {
     const en = s.entries.find(e => e.exId === exId); if (!en) continue;
     const done = en.sets.filter(x => filled(x) && num(x.w) > 0);
     if (!done.length) continue;
-    const v = metric === 'vol' ? done.reduce((a, x) => a + setVol(x), 0)
-            : metric === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
+    const v = mt === 'vol' ? done.reduce((a, x) => a + setVol(x), 0)
+            : mt === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
             : Math.max.apply(null, done.map(x => e1rm(num(x.w), num(x.r))));
-    pts.push({ label: mdLabel(s.date), v });
+    // 高回数だと Epley 式は過大に出るので、注意表示のために最大回数も持たせる
+    pts.push({ label: mdLabel(s.date), date: s.date, v, maxReps: Math.max.apply(null, done.map(x => num(x.r))) });
   }
-  if (pts.length < 1) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
-
-  box.innerHTML = pts.length === 1 ? barChart(pts) : lineChart(pts.slice(-20));
-
-  const max = Math.max.apply(null, pts.map(p => p.v));
-  const unit = metric === 'vol' ? 'kg（総量）' : 'kg';
-  const name = metric === 'vol' ? '最高ボリューム' : metric === 'top' ? '最大重量' : '推定1RM 最高';
-  best.textContent = name + '：' + (Math.round(max * 10) / 10) + ' ' + unit +
-    (metric === 'e1rm' ? '（Epley式・10回以下で概ね妥当）' : '');
+  return pts;
 }
+function bestLine(pts, mt) {
+  if (!pts.length) return '';
+  const max = Math.max.apply(null, pts.map(p => p.v));
+  const name = mt === 'vol' ? '最高ボリューム' : mt === 'top' ? '最大重量' : '推定1RM 最高';
+  const over = mt === 'e1rm' && pts.some(p => p.maxReps > 10);
+  return name + '：' + (Math.round(max * 10) / 10) + ' kg' +
+    (mt === 'e1rm' ? (over ? '（⚠ 11回以上のセットを含むため過大評価の可能性）' : '（Epley式）') : '');
+}
+function drawInto(box, pts) {
+  box.innerHTML = !pts.length ? '<div class="empty">データがありません。</div>'
+    : pts.length === 1 ? barChart(pts) : lineChart(pts.slice(-20));
+}
+
+function renderExChart() {
+  const exId = $('#statEx').value;
+  const box = $('#exChart'), best = $('#exBest');
+  if (!exId) { box.innerHTML = '<div class="empty">データがありません。</div>'; best.textContent = ''; return; }
+  const pts = exPoints(exId, metric);
+  drawInto(box, pts);
+  best.textContent = bestLine(pts, metric);
+}
+
+/* ---- 種目別グラフのシート（記録ページの 📈 から開く） ---- */
+let chExId = null, chMetric = 'e1rm';
+
+function openExChart(exId) {
+  chExId = exId;
+  $('#chTitle').textContent = exName(exId) + ' の推移';
+  renderChartSheet();
+  openModal('#mChart');
+}
+function renderChartSheet() {
+  if (!chExId) return;
+  const pts = exPoints(chExId, chMetric);
+  drawInto($('#chBox'), pts);
+  $('#chBest').textContent = bestLine(pts, chMetric);
+
+  // 直近の記録を新しい順に
+  const rows = [];
+  for (const s of db.sessions.slice().sort((a, b) => a.date < b.date ? 1 : -1)) {
+    const en = s.entries.find(e => e.exId === chExId); if (!en) continue;
+    const done = en.sets.filter(filled);
+    if (!done.length) continue;
+    rows.push('<div class="list-item"><div class="t"><b>' + s.date + '</b><span>' +
+      esc(done.map(x => num(x.w) + 'kg×' + num(x.r)).join(' / ')) + '</span></div>' +
+      '<div style="font-size:12px;color:var(--muted);white-space:nowrap">' +
+      fmt(done.reduce((a, x) => a + setVol(x), 0)) + ' kg</div></div>');
+    if (rows.length >= 30) break;
+  }
+  $('#chList').innerHTML = rows.length ? rows.join('') : '<div class="empty">記録がありません。</div>';
+}
+$$('[data-cmetric]').forEach(c => c.addEventListener('click', () => {
+  $$('[data-cmetric]').forEach(x => x.classList.toggle('on', x === c));
+  chMetric = c.dataset.cmetric;
+  renderChartSheet();
+}));
 
 /* ---- SVG チャート（依存ライブラリなし） ---- */
 function scaleY(vals) {
