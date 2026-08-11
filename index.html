@@ -141,6 +141,13 @@
   .delta.up{background:color-mix(in srgb, var(--accent2) 20%, transparent); color:var(--accent2)}
   .delta.down{background:color-mix(in srgb, var(--danger) 18%, transparent); color:var(--danger)}
   .pr-badge{font-size:calc(15px * var(--fs)); line-height:1; flex:0 0 auto}
+  .goal-line{padding:6px 14px 0}
+  .goal{
+    background:color-mix(in srgb, var(--accent) 14%, transparent);
+    border:1px dashed var(--accent); color:var(--accent);
+    border-radius:999px; padding:4px 11px; font-size:calc(11px * var(--fs)); font-weight:700;
+  }
+  .goal:active{background:var(--accent); color:var(--on-accent); border-style:solid}
   .sets{padding:8px 10px 12px}
   .set-row{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; align-items:center; margin-bottom:6px}
   .set-row.bw, .set-head.bw{grid-template-columns:22px 1fr 38px 28px}
@@ -358,13 +365,18 @@
           <div class="wbars" id="wbars"></div>
         </div>
         <div class="tile"><span>合計負荷量 / 28日間</span><b id="k28" class="gradnum">0.00<i>t</i></b></div>
-        <div class="tile" style="margin-bottom:0"><span>総合計負荷量</span><b id="kAll" class="gradnum">0.00<i>t</i></b></div>
+        <div class="tile" style="margin-bottom:0"><span>総合計負荷量</span><b id="kAll" class="gradnum">0.00<i>t</i></b>
+          <div id="kEquiv" style="font-size:calc(10px * var(--fs));color:var(--muted);margin-top:2px"></div>
+        </div>
       </div>
     </div>
 
-    <button class="btn primary block lg" id="btnStart" style="margin-bottom:8px">
-      <span id="startLabel">＋ 本日のトレーニングを追加</span>
-    </button>
+    <div class="row" style="margin-bottom:8px">
+      <button class="btn primary lg" id="btnStart" style="flex:1">
+        <span id="startLabel">＋ 本日のトレーニングを追加</span>
+      </button>
+      <button class="btn lg" id="btnCalc" style="flex:0 0 52px" title="計算機">🧮</button>
+    </div>
 
     <div class="card" style="margin-bottom:0">
       <div class="stats-grid">
@@ -425,7 +437,18 @@
   <section class="view" id="v-stats">
     <div class="chips" id="statTabs" style="margin:0 0 8px">
       <button class="chip on" data-stab="train">トレーニング</button>
+      <button class="chip" data-stab="pr">自己ベスト</button>
       <button class="chip" data-stab="body">からだ</button>
+    </div>
+
+    <div class="subview" id="stPr" style="display:none">
+      <div class="card">
+        <div id="prHead" style="text-align:center"></div>
+      </div>
+      <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1;margin-bottom:0">
+        <h2>種目別の自己ベスト</h2>
+        <div class="scroll" id="prList"></div>
+      </div>
     </div>
 
     <div class="subview" id="stBody" style="display:none">
@@ -601,6 +624,51 @@
 
     <button class="btn block ghost" id="btnThemeReset" style="margin-top:14px">既定に戻す</button>
     <button class="btn block ghost" data-close style="margin-top:8px">閉じる</button>
+  </div>
+</div>
+
+<!-- 計算機 -->
+<div class="modal" id="mCalc">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3>計算機</h3>
+    <div class="chips" id="calcTabs" style="margin-top:0">
+      <button class="chip on" data-calc="rm">1RM換算</button>
+      <button class="chip" data-calc="plate">プレート</button>
+    </div>
+
+    <div id="calcRm">
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1"><label class="fld">挙げた重量 (kg)</label>
+          <input type="number" inputmode="decimal" step="0.5" id="rmW" placeholder="60"></div>
+        <div style="flex:1"><label class="fld">回数</label>
+          <input type="number" inputmode="numeric" step="1" id="rmR" placeholder="8"></div>
+      </div>
+      <div class="card" style="margin:10px 0 0;text-align:center">
+        <span style="font-size:calc(11px * var(--fs));color:var(--muted)">推定1RM（Epley式）</span>
+        <b id="rmOut" class="gradnum" style="display:block;font-size:calc(30px * var(--fs));font-weight:800">—</b>
+        <div id="rmNote" style="font-size:calc(11px * var(--fs));color:var(--muted)"></div>
+      </div>
+      <div id="rmTable" style="margin-top:10px;max-height:34vh;overflow-y:auto"></div>
+    </div>
+
+    <div id="calcPlate" style="display:none">
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:1"><label class="fld">目標重量 (kg)</label>
+          <input type="number" inputmode="decimal" step="0.5" id="plW" placeholder="100"></div>
+        <div style="flex:1"><label class="fld">シャフト</label>
+          <select id="plBar">
+            <option value="20">20kg（標準）</option>
+            <option value="15">15kg（女性用）</option>
+            <option value="10">10kg（軽量）</option>
+            <option value="7">7kg（EZバー）</option>
+            <option value="0">0kg（片側のみ計算）</option>
+          </select></div>
+      </div>
+      <div id="plOut" style="margin-top:12px"></div>
+    </div>
+
+    <button class="btn block ghost" data-close style="margin-top:12px">閉じる</button>
   </div>
 </div>
 
@@ -927,6 +995,31 @@ function prState(exId, date) {
   };
 }
 
+// 前回の内容から次の目標を出す。漸進性過負荷の素朴な規則：
+// 目標回数（10回）に届いていれば回数を1つ増やし、届いたら重量を上げて回数を戻す。
+const REP_CEIL = 10, WEIGHT_STEP = 2.5;
+function nextGoal(exId, date) {
+  const kind = kindOf(exId);
+  const past = exDays(exId).filter(x => x.date < date);
+  if (!past.length) return null;
+  const s = past[past.length - 1].sum;
+  if (kind === 'cardio') {
+    if (s.d > 0) return { d: Math.round((s.d + 0.5) * 10) / 10, t: s.t || '', text: (Math.round((s.d + 0.5) * 10) / 10) + 'km' };
+    if (s.t > 0) return { t: s.t + 5, d: '', text: (s.t + 5) + '分' };
+    return null;
+  }
+  if (kind === 'bw') {
+    if (!(s.r > 0)) return null;
+    return { r: s.r + 1, text: (s.r + 1) + '回' };
+  }
+  if (!(s.w > 0 && s.r > 0)) return null;
+  if (s.r >= REP_CEIL) {
+    const w = Math.round((s.w + WEIGHT_STEP) * 10) / 10;
+    return { w, r: Math.max(6, REP_CEIL - 2), text: w + 'kg×' + Math.max(6, REP_CEIL - 2) };
+  }
+  return { w: s.w, r: s.r + 1, text: s.w + 'kg×' + (s.r + 1) };
+}
+
 // その日より前で、その種目を最後にやったセッションの完了セット
 function prevSets(exId, beforeDate) {
   const cands = db.sessions
@@ -979,7 +1072,7 @@ function showView(v) {
   if (v === 'home') renderHome();
   if (v === 'log') renderLog();
   if (v === 'hist') renderHist();
-  if (v === 'stats') { if (statTab === 'body') renderBody(); else renderStats(); }
+  if (v === 'stats') renderStatTab();
   if (v === 'ex') renderExMaster();
 }
 $$('nav button').forEach(b => b.addEventListener('click', () => showView(b.dataset.view)));
@@ -1006,6 +1099,10 @@ function renderLog() {
         : '前回の記録なし';
       const deltaTag = pr.delta
         ? '<span class="delta ' + (pr.delta[0] === '+' ? 'up' : 'down') + '">前回比 ' + esc(pr.delta) + '</span>'
+        : '';
+      const goal = nextGoal(en.exId, curDate);
+      const goalTag = goal
+        ? '<button class="goal" data-act="goal" data-e="' + ei + '">🎯 次の目標 ' + esc(goal.text) + '</button>'
         : '';
 
       const ro = inputMode === 'wheel' ? ' readonly' : '';
@@ -1038,6 +1135,7 @@ function renderLog() {
           '<button class="btn sm ghost" data-act="delex" data-e="' + ei + '">✕</button>' +
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + deltaTag + '</div>' +
+        (goalTag ? '<div class="goal-line">' + goalTag + '</div>' : '') +
         '<div class="sets">' +
           '<div class="set-head' + (bw ? ' bw' : '') + '"><div></div>' + (cardio ? '<div>時間(分)</div><div>距離(km)</div>' : (bw ? '' : '<div>重量(kg)</div>') + '<div>回数</div>') + '<div>追加</div><div></div></div>' +
           rows +
@@ -1151,7 +1249,9 @@ const tons = kg => (kg / 1000).toFixed(2);
 function renderLoadPanel() {
   $('#k7').innerHTML = tons(volLastDays(7)) + '<i>t</i>';
   $('#k28').innerHTML = tons(volLastDays(28)) + '<i>t</i>';
-  $('#kAll').innerHTML = tons(db.sessions.reduce((a, s) => a + sessionVolume(s), 0)) + '<i>t</i>';
+  const allKg = db.sessions.reduce((a, s) => a + sessionVolume(s), 0);
+  $('#kAll').innerHTML = tons(allKg) + '<i>t</i>';
+  $('#kEquiv').textContent = equivText(allKg);
 
   // 今週〜5週前の週別ボリューム
   const byWeek = {};
@@ -1297,6 +1397,21 @@ $('#logBody').addEventListener('click', e => {
       en.sets = prev.sets.map(s => ({ w: String(num(s.w)), r: String(num(s.r)), }));
       saveDay(); renderLog();
     }
+    return;
+  }
+  if (act === 'goal') {
+    const en = sess.entries[+btn.dataset.e];
+    const g = nextGoal(en.exId, curDate);
+    if (!g) return;
+    let n = 0;
+    for (const st of en.sets) {
+      if (filled(st)) continue;                       // 入力済みのセットは触らない
+      for (const k of ['w', 'r', 't', 'd']) if (g[k] !== undefined && g[k] !== '') st[k] = String(g[k]);
+      n++;
+    }
+    if (!n) { toast('空のセットがありません'); return; }
+    saveDay(); renderLog();
+    toast(g.text + ' を ' + n + 'セットに入れました');
     return;
   }
   if (act === 'chart') {
@@ -1700,7 +1815,7 @@ let rsTimer;
 window.addEventListener('resize', () => {
   clearTimeout(rsTimer);
   rsTimer = setTimeout(() => {
-    if (curView === 'stats') { if (statTab === 'body') renderBody(); else renderStats(); }
+    if (curView === 'stats') renderStatTab();
     if ($('#mChart').classList.contains('open')) renderChartSheet();
   }, 200);
 });
@@ -1894,15 +2009,21 @@ $('#heightSave').addEventListener('click', () => {
   if (curView === 'stats') renderBody();
 });
 
-// 分析タブ内の「トレーニング / からだ」切替
+// 分析タブ内の切替
 let statTab = 'train';
+function renderStatTab() {
+  if (statTab === 'body') renderBody();
+  else if (statTab === 'pr') renderPr();
+  else renderStats();
+}
 $('#statTabs').addEventListener('click', e => {
   const b = e.target.closest('[data-stab]'); if (!b) return;
   statTab = b.dataset.stab;
   $$('#statTabs .chip').forEach(c => c.classList.toggle('on', c === b));
   $('#stTrain').style.display = statTab === 'train' ? '' : 'none';
   $('#stBody').style.display = statTab === 'body' ? '' : 'none';
-  if (statTab === 'body') renderBody(); else renderStats();
+  $('#stPr').style.display = statTab === 'pr' ? '' : 'none';
+  renderStatTab();
 });
 
 /* ---- SVG チャート（依存ライブラリなし） ----
@@ -2312,6 +2433,157 @@ document.addEventListener('visibilitychange', () => {
   if (!gh.token || !gh.auto) return;
   syncNow(true);
 });
+
+/* ============================================================
+   計算機（1RM換算 / プレート）
+============================================================ */
+// 1RM に対する割合と、その重量で挙げられる目安の回数
+const RM_PCT = [[100,1],[95,2],[92,3],[89,4],[86,5],[83,6],[81,7],[78,8],[76,9],[74,10],[70,12],[65,15]];
+const PLATES = [20, 15, 10, 5, 2.5, 1.25];
+
+function renderRm() {
+  const w = num($('#rmW').value), r = num($('#rmR').value);
+  const one = e1rm(w, r);
+  $('#rmOut').textContent = one ? (Math.round(one * 10) / 10) + ' kg' : '—';
+  $('#rmNote').textContent = !one ? '重量と回数を入れてください'
+    : r > 10 ? '⚠ 11回以上では過大評価になりがちです'
+    : w + 'kg × ' + r + '回 から換算';
+  $('#rmTable').innerHTML = !one ? '' :
+    '<div style="font-size:calc(11px * var(--fs));color:var(--muted);margin-bottom:4px">目標回数ごとの重量の目安</div>' +
+    RM_PCT.map(([pc, reps]) => {
+      const kg = Math.round(one * pc / 100 * 2) / 2;    // 0.5kg 刻みに丸める
+      return '<div class="list-item" style="padding:7px 0">' +
+        '<div class="t"><b>' + reps + '回</b><span>1RMの ' + pc + '%</span></div>' +
+        '<div style="font-weight:700;font-variant-numeric:tabular-nums">' + kg + ' kg</div></div>';
+    }).join('');
+}
+
+// 片側に載せるプレートを大きい方から詰めていく
+function platesFor(perSide) {
+  const out = [];
+  let rest = perSide;
+  for (const pl of PLATES) {
+    const n = Math.floor((rest + 1e-9) / pl);
+    if (n > 0) { out.push([pl, n]); rest = Math.round((rest - pl * n) * 100) / 100; }
+  }
+  return { list: out, rest };
+}
+
+function renderPlate() {
+  const target = num($('#plW').value), bar = num($('#plBar').value);
+  const box = $('#plOut');
+  if (!(target > 0)) { box.innerHTML = '<div class="empty">目標重量を入れてください。</div>'; return; }
+  if (target < bar) { box.innerHTML = '<div class="empty">シャフト（' + bar + 'kg）より軽い重量です。</div>'; return; }
+
+  const perSide = (target - bar) / 2;
+  const { list, rest } = platesFor(perSide);
+  const made = bar + (perSide - rest) * 2;
+
+  box.innerHTML =
+    '<div style="font-size:calc(11px * var(--fs));color:var(--muted)">片側に付けるプレート</div>' +
+    (list.length
+      ? '<div class="chips" style="margin:6px 0">' +
+        list.map(([pl, n]) => '<span class="chip on">' + pl + 'kg × ' + n + '</span>').join('') + '</div>'
+      : '<div class="empty" style="padding:12px">プレートなし（シャフトのみ）</div>') +
+    '<div class="list-item"><div class="t"><b>' + (Math.round(made * 100) / 100) + ' kg</b>' +
+      '<span>シャフト ' + bar + 'kg ＋ 片側 ' + (Math.round((perSide - rest) * 100) / 100) + 'kg ×2</span></div></div>' +
+    (rest > 0.001
+      ? '<div style="font-size:calc(11px * var(--fs));color:var(--danger);margin-top:6px">' +
+        '手持ちのプレートでは ' + (Math.round(rest * 2 * 100) / 100) + 'kg 足りません（最も近い組み合わせを表示）</div>'
+      : '');
+}
+
+$('#btnCalc').addEventListener('click', () => {
+  if (!$('#rmW').value) {
+    // 直近に記録した重量と回数を初期値にする
+    const last = db.sessions.slice().sort((a, b) => a.date < b.date ? 1 : -1)[0];
+    if (last) for (const en of last.entries) {
+      if (kindOf(en.exId) !== 'weight') continue;
+      const done = en.sets.filter(filled);
+      if (done.length) { $('#rmW').value = num(done[0].w) || ''; $('#rmR').value = num(done[0].r) || ''; break; }
+    }
+  }
+  renderRm(); renderPlate(); openModal('#mCalc');
+});
+$('#calcTabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-calc]'); if (!b) return;
+  $$('#calcTabs .chip').forEach(c => c.classList.toggle('on', c === b));
+  const rm = b.dataset.calc === 'rm';
+  $('#calcRm').style.display = rm ? '' : 'none';
+  $('#calcPlate').style.display = rm ? 'none' : '';
+});
+['#rmW', '#rmR'].forEach(id => $(id).addEventListener('input', renderRm));
+['#plW', '#plBar'].forEach(id => $(id).addEventListener('input', renderPlate));
+$('#plBar').addEventListener('change', renderPlate);
+
+/* ============================================================
+   自己ベスト一覧
+============================================================ */
+// 種目ごとの最高記録と、それを出した日
+function bestOf(exId) {
+  const kind = kindOf(exId);
+  const days = exDays(exId);
+  if (!days.length) return null;
+  let best = null;
+  for (const d of days) {
+    const v = prMetric(d.sum, kind);
+    if (!best || v > best.v) best = { v, date: d.date, sum: d.sum };
+  }
+  if (!best || !(best.v > 0)) return null;
+  const s = best.sum;
+  best.kind = kind;
+  best.main = kind === 'cardio' ? (s.d > 0 ? s.d + ' km' : s.t + ' 分')
+    : kind === 'bw' ? s.r + ' 回'
+    : s.w + ' kg × ' + s.r;
+  best.sub = kind === 'cardio' ? (s.t > 0 && s.d > 0 ? s.t + '分' : '')
+    : kind === 'bw' ? ''
+    : '推定1RM ' + (Math.round(s.e * 10) / 10) + 'kg';
+  return best;
+}
+
+function renderPr() {
+  const rows = [];
+  for (const ex of db.exercises) {
+    const b = bestOf(ex.id);
+    if (b) rows.push({ ex, b });
+  }
+  rows.sort((a, b) => a.b.date < b.b.date ? 1 : -1);
+
+  const month = today().slice(0, 7);
+  const fresh = rows.filter(r => r.b.date.slice(0, 7) === month).length;
+  $('#prHead').innerHTML = rows.length
+    ? '<b class="gradnum" style="font-size:calc(26px * var(--fs));font-weight:800">' + fresh + '</b>' +
+      '<span style="font-size:calc(12px * var(--fs));color:var(--muted);display:block">今月 自己ベストを更新した種目</span>' +
+      '<div style="font-size:calc(11px * var(--fs));color:var(--muted);margin-top:4px">記録のある種目 ' + rows.length + '件</div>'
+    : '<div class="empty" style="padding:10px">まだ記録がありません。</div>';
+
+  $('#prList').innerHTML = rows.length ? rows.map(r => {
+    const isNew = r.b.date.slice(0, 7) === month;
+    const c = CAT_COLOR[catOf(r.ex.id)] || '#94a3b8';
+    return '<div class="list-item">' +
+      '<span style="color:' + c + '">●</span>' +
+      '<div class="t"><b>' + (isNew ? '🏆 ' : '') + esc(r.ex.name) + '</b>' +
+      '<span>' + esc(r.b.date) + (r.b.sub ? ' ／ ' + esc(r.b.sub) : '') + '</span></div>' +
+      '<div style="font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums">' + esc(r.b.main) + '</div>' +
+    '</div>';
+  }).join('') : '<div class="empty">記録のある種目がありません。</div>';
+}
+
+/* ============================================================
+   累計挙上量の言い換え
+============================================================ */
+const EQUIV = [
+  [150000, '🐋', 'シロナガスクジラ'], [40000, '🚄', '新幹線1両'], [10000, '🚚', 'トラック'],
+  [5000, '🐘', 'ゾウ'], [1500, '🚗', '乗用車'], [800, '🚙', '軽自動車'],
+  [200, '🏍️', 'バイク'], [100, '🧊', '冷蔵庫'], [60, '🧍', '大人'],
+];
+function equivText(kg) {
+  if (!(kg > 0)) return '';
+  for (const [w, icon, name] of EQUIV) {
+    if (kg >= w) return icon + ' ' + name + ' ' + (Math.round(kg / w * 10) / 10) + ' 個分';
+  }
+  return '';
+}
 
 /* ============================================================
    テーマ（設定画面）
