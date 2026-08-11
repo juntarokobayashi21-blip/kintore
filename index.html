@@ -6,12 +6,18 @@
 <meta name="theme-color" content="#0e1116">
 <title>筋トレ記録</title>
 <style>
+  /* 配色はすべてトークン化。設定画面から :root に上書きして切り替える */
   :root{
     --bg:#0a0d13; --panel:#141924; --panel2:#1b2130; --line:#252d3d;
-    --fg:#e9eef7; --muted:#7e8a9e; --accent:#7dd3fc; --accent2:#a3e635;
-    --danger:#f87171; --radius:16px;
-    --grad:linear-gradient(135deg,#7dd3fc 0%,#a5f3fc 45%,#a3e635 100%);
+    --fg:#e9eef7; --muted:#7e8a9e;
+    --card1:#171d2a; --card2:#131824;
+    --nav1:#161c29; --nav2:#10141d; --head1:#111725;
+    --exh1:#1e2534; --exh2:#1a2130; --sheet1:#1a2130; --grip:#3a4459;
+    --grid:#222a37; --axis:#8d99ac;
     --inset:inset 0 1px 0 rgba(255,255,255,.045);
+    --accent:#7dd3fc; --accent2:#a3e635;
+    --grad:linear-gradient(135deg,#7dd3fc 0%,#a5f3fc 45%,#a3e635 100%);
+    --danger:#f87171; --radius:16px;
   }
   /* 主要な数値はグラデーションで抜く */
   .gradnum{background:var(--grad); -webkit-background-clip:text; background-clip:text;
@@ -31,7 +37,7 @@
 
   header{
     flex:0 0 auto; z-index:20;
-    background:linear-gradient(180deg,#111725 0%,var(--bg) 100%);
+    background:linear-gradient(180deg,var(--head1) 0%,var(--bg) 100%);
     border-bottom:1px solid var(--line);
     padding:8px 12px; padding-top:calc(8px + env(safe-area-inset-top));
     display:flex; align-items:center; gap:8px;
@@ -51,7 +57,7 @@
   nav{
     flex:0 0 auto; z-index:30;
     display:grid; grid-template-columns:repeat(4,1fr);
-    background:linear-gradient(180deg,#161c29,#10141d);
+    background:linear-gradient(180deg,var(--nav1),var(--nav2));
     border-top:1px solid var(--line);
     padding-bottom:env(safe-area-inset-bottom);
   }
@@ -60,7 +66,7 @@
     padding:7px 4px 8px; font-size:10px; display:flex;
     flex-direction:column; align-items:center; gap:2px; letter-spacing:.02em;
   }
-  nav button .ic{font-size:18px; line-height:1; opacity:.65; transition:opacity .15s}
+  nav button .ic{font-size:18px; line-height:1; opacity:.6; transition:opacity .15s}
   nav button.active{color:var(--accent)}
   nav button.active .ic{opacity:1}
   /* 選択中のタブに上部インジケータ */
@@ -70,7 +76,7 @@
   }
 
   .card{
-    background:linear-gradient(180deg,#171d2a 0%,#131824 100%);
+    background:linear-gradient(180deg,var(--card1) 0%,var(--card2) 100%);
     border:1px solid var(--line); border-radius:var(--radius);
     padding:12px; margin-bottom:8px; box-shadow:var(--inset);
   }
@@ -86,11 +92,11 @@
   .btn:active{transform:scale(.97); filter:brightness(1.12)}
   .btn.primary{
     background:var(--grad); border-color:transparent; color:#062231; font-weight:800;
-    box-shadow:0 6px 18px rgba(125,211,252,.18), var(--inset);
+    box-shadow:0 6px 18px rgba(0,0,0,.22), var(--inset);
   }
   .btn.has-memo{border-color:var(--accent2); color:var(--accent2)}
   .btn.ghost{background:transparent}
-  .btn.danger{color:var(--danger); border-color:#4a2a2e}
+  .btn.danger{color:var(--danger); border-color:color-mix(in srgb, var(--danger) 32%, var(--line))}
   .btn.block{width:100%; justify-content:center; display:flex}
   .btn.lg{padding:14px; font-size:16px}
   .btn.sm{padding:6px 10px; font-size:13px; border-radius:8px}
@@ -101,18 +107,18 @@
     transition:border-color .15s, box-shadow .15s;
   }
   input:focus,select:focus,textarea:focus{
-    border-color:var(--accent); box-shadow:0 0 0 3px rgba(125,211,252,.13);
+    border-color:var(--accent); box-shadow:0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
   }
   textarea{resize:vertical; font-size:15px; line-height:1.6}
   label.fld{display:block; font-size:12px; color:var(--muted); margin:0 0 4px}
 
   /* --- 記録 --- */
   .ex-block{
-    background:linear-gradient(180deg,#171d2a,#131824); border:1px solid var(--line);
+    background:linear-gradient(180deg,var(--card1),var(--card2)); border:1px solid var(--line);
     border-radius:var(--radius); margin-bottom:10px; overflow:hidden; box-shadow:var(--inset);
   }
   .ex-head{display:flex; align-items:center; gap:6px; padding:10px 12px;
-    border-bottom:1px solid var(--line); background:linear-gradient(180deg,#1e2534,#1a2130)}
+    border-bottom:1px solid var(--line); background:linear-gradient(180deg,var(--exh1),var(--exh2))}
   .ex-head .name{font-weight:700; font-size:15px; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .ex-head .cat{font-size:11px; color:var(--muted); background:var(--bg); border-radius:999px; padding:2px 8px; white-space:nowrap}
   .prev-line{font-size:12px; color:var(--muted); padding:8px 14px 0}
@@ -120,13 +126,13 @@
   .set-row{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; align-items:center; margin-bottom:6px}
   .set-row .n{text-align:center; font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
   .set-row input{padding:12px 8px; text-align:center; font-size:16px; font-variant-numeric:tabular-nums}
-  .set-row input::placeholder{color:#4d5866}
+  .set-row input::placeholder{color:color-mix(in srgb, var(--muted) 65%, transparent)}
   /* 回数が入っているセット＝記録済み。緑の左線と背景で示す */
-  .set-row.is-done input{border-color:#3d5a2e; background:#1b2418}
+  .set-row.is-done input{border-color:var(--accent2); background:color-mix(in srgb, var(--accent2) 13%, var(--panel2))}
   .set-row.is-done .n{color:var(--accent2); font-weight:700}
   .set-row .cp{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:12px 0; font-size:14px; color:var(--muted); line-height:1}
   .set-row .cp:active{background:var(--accent); color:#07121a}
-  .set-row .del{background:none; border:0; color:#5b6674; font-size:18px; padding:0}
+  .set-row .del{background:none; border:0; color:var(--muted); font-size:18px; padding:0}
   .set-head{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; font-size:11px; color:var(--muted); padding:0 0 4px; text-align:center}
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
 
@@ -173,9 +179,9 @@
     font-size:12px; font-variant-numeric:tabular-nums; color:var(--fg);
   }
   .cal-grid.wide .cal-d{max-width:40px; font-size:14px}
-  .cal-d.other{color:#4b5563}
+  .cal-d.other{color:color-mix(in srgb, var(--muted) 62%, transparent)}
   .cal-d.sun{color:#e08a8a} .cal-d.sat{color:#8fb6d4}
-  .cal-d.other.sun,.cal-d.other.sat{color:#4b5563}
+  .cal-d.other.sun,.cal-d.other.sat{color:color-mix(in srgb, var(--muted) 62%, transparent)}
   /* 記録がある日の配色は部位ごとの色を JS が inline で当てる（選択日には当てない） */
   .cal-d.has{font-weight:700}
   .cal-d.today{border-color:var(--accent); color:var(--accent)}
@@ -190,11 +196,11 @@
   }
   .wheel::-webkit-scrollbar{display:none}
   .wheel .it{height:34px; display:flex; align-items:center; justify-content:center; scroll-snap-align:center;
-    font-size:17px; color:#6b7787; font-variant-numeric:tabular-nums; transition:color .12s}
+    font-size:17px; color:var(--muted); font-variant-numeric:tabular-nums; transition:color .12s}
   .wheel .it.on{color:var(--fg); font-weight:700; font-size:23px}
   .wheel .pad{height:85px}
   .wheel-band{position:absolute; left:0; right:0; top:85px; height:34px; pointer-events:none;
-    border-top:1px solid var(--accent); border-bottom:1px solid var(--accent); background:rgba(125,211,252,.08)}
+    border-top:1px solid var(--accent); border-bottom:1px solid var(--accent); background:color-mix(in srgb, var(--accent) 12%, transparent)}
   .wheel-sep{font-size:22px; color:var(--muted); align-self:center; margin-top:-4px}
   .wheel-unit{font-size:14px; color:var(--muted); align-self:center; margin-top:-4px}
 
@@ -216,7 +222,7 @@
 
   /* メモ行 */
   .memoline{
-    font-size:12px; color:#b6c2d4; background:rgba(163,230,53,.07);
+    font-size:12px; color:var(--fg); background:var(--panel2);
     border-left:2px solid var(--accent2); border-radius:0 8px 8px 0;
     padding:6px 10px; margin-bottom:6px; white-space:pre-wrap; word-break:break-word;
     max-height:3.6em; overflow:auto;
@@ -225,13 +231,13 @@
   .chartcard{display:flex; flex-direction:column; min-height:0; flex:1}
   .chartbox{flex:1; min-height:80px; display:flex; margin-top:6px}
   svg.chart{width:100%; height:100%; display:block}
-  svg .grid{stroke:#222a37; stroke-width:1}
-  svg .axis{fill:#8d99ac; font-size:11px; font-variant-numeric:tabular-nums}
+  svg .grid{stroke:var(--grid); stroke-width:1}
+  svg .axis{fill:var(--axis); font-size:11px; font-variant-numeric:tabular-nums}
   svg .val{fill:var(--fg); font-size:13px; font-weight:800; font-variant-numeric:tabular-nums}
   svg .ln{fill:none; stroke:var(--accent); stroke-width:2.5; stroke-linejoin:round; stroke-linecap:round}
-  svg .pt{fill:#0a0d13; stroke:var(--accent); stroke-width:2}
-  svg .bar{fill:#4b6b2a}
-  svg .bar.now{fill:var(--accent2)}
+  svg .pt{fill:var(--bg); stroke:var(--accent); stroke-width:2}
+  svg .bar{fill:var(--accent2); opacity:.36}
+  svg .bar.now{opacity:1}
 
   /* 記録が1件のときは折れ線にせず値を見せる */
   .onept{display:flex; flex-direction:column; align-items:center; justify-content:center;
@@ -250,8 +256,8 @@
   .modal .backdrop{backdrop-filter:blur(2px)}
   .modal .sheet{
     position:absolute; left:0; right:0; bottom:0; max-height:88vh; overflow:auto;
-    background:linear-gradient(180deg,#1a2130 0%,#12172200 60%), var(--panel);
-    border-radius:20px 20px 0 0; border-top:1px solid #333d50;
+    background:linear-gradient(180deg,var(--sheet1) 0%,transparent 60%), var(--panel);
+    border-radius:20px 20px 0 0; border-top:1px solid color-mix(in srgb, var(--fg) 14%, var(--line));
     padding:14px 14px calc(16px + env(safe-area-inset-bottom));
     box-shadow:0 -14px 40px rgba(0,0,0,.5);
     animation:sheetUp .22s cubic-bezier(.2,.9,.3,1);
@@ -260,7 +266,7 @@
   /* シート上部のつまみ */
   .modal .sheet::before{
     content:''; display:block; width:38px; height:4px; border-radius:2px;
-    background:#3a4459; margin:0 auto 12px;
+    background:var(--grip); margin:0 auto 12px;
   }
   .modal .sheet h3{margin:0 0 12px; font-size:16px; font-weight:700}
   .chips{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0}
@@ -271,6 +277,17 @@
   .pick{display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line); font-size:15px}
   .pick .cat{font-size:11px; color:var(--muted)}
   .pick.sel{color:var(--accent2); font-weight:600}
+  /* 設定画面の配色スウォッチ */
+  .swatches{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+  .sw{
+    border:1px solid var(--line); border-radius:12px; padding:8px 6px 7px;
+    background:var(--panel2); display:flex; flex-direction:column; align-items:center; gap:6px;
+    font-size:11px; color:var(--muted); box-shadow:var(--inset);
+  }
+  .sw .bar2{width:100%; height:16px; border-radius:5px}
+  .sw.on{border-color:var(--accent); color:var(--fg); font-weight:700}
+  .sw.on .bar2{box-shadow:0 0 0 2px var(--bg), 0 0 0 3px var(--accent)}
+
   .toast{
     position:fixed; left:50%; transform:translateX(-50%); bottom:88px; z-index:60;
     background:var(--panel2); border:1px solid var(--line); border-radius:999px;
@@ -286,6 +303,7 @@
   <h1 id="hdr">筋トレ記録</h1>
   <div class="spacer"></div>
   <button class="btn sm ghost" id="btnBackup">バックアップ</button>
+  <button class="btn sm ghost" id="btnSettings" title="設定">⚙</button>
 </header>
 
 <main>
@@ -458,6 +476,37 @@
       <button class="btn ghost" data-close style="flex:1">キャンセル</button>
       <button class="btn primary" id="rtSave" style="flex:1">保存</button>
     </div>
+  </div>
+</div>
+
+<!-- 設定 -->
+<div class="modal" id="mSettings">
+  <div class="backdrop" data-close></div>
+  <div class="sheet">
+    <h3>設定</h3>
+
+    <label class="fld">アクセントカラー</label>
+    <div class="swatches" id="accentList"></div>
+
+    <label class="fld" style="margin-top:16px">背景</label>
+    <div class="swatches" id="baseList"></div>
+
+    <label class="fld" style="margin-top:16px">プレビュー</label>
+    <div class="card" style="margin:0">
+      <div class="stats-grid">
+        <div class="stat"><b class="gradnum">1.24</b><span>合計負荷量 t</span></div>
+        <div class="stat"><b>12</b><span>セット</span></div>
+        <div class="stat"><b>3</b><span>種目</span></div>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="btn sm">通常</button>
+        <button class="btn sm primary">主要ボタン</button>
+        <button class="chip on">選択中</button>
+      </div>
+    </div>
+
+    <button class="btn block ghost" id="btnThemeReset" style="margin-top:14px">既定に戻す</button>
+    <button class="btn block ghost" data-close style="margin-top:8px">閉じる</button>
   </div>
 </div>
 
@@ -862,7 +911,7 @@ function buildCal(cursor, opt) {
     let style = '';
     if (it && !isSel) {
       const c = opt.cat ? CAT_COLOR[opt.cat]
-              : (it.cats.length === 1 ? (CAT_COLOR[it.cats[0]] || '#a3e635') : '#a3e635');
+              : (it.cats.length === 1 ? (CAT_COLOR[it.cats[0]] || cssVar('--accent2')) : cssVar('--accent2'));
       style = (median > 0 && it.vol > median)
         ? ' style="background:' + c + ';border-color:' + c + ';color:#07121a"'
         : ' style="background:' + c + '33;border-color:' + c + ';color:' + c + '"';
@@ -1588,8 +1637,8 @@ function lineChart(pts, box) {
 
   return '<svg class="chart" viewBox="0 0 ' + W + ' ' + H + '">' +
     '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">' +
-    '<stop offset="0%" stop-color="#7dd3fc" stop-opacity=".30"/>' +
-    '<stop offset="100%" stop-color="#7dd3fc" stop-opacity="0"/></linearGradient></defs>' +
+    '<stop offset="0%" stop-color="var(--accent)" stop-opacity=".30"/>' +
+    '<stop offset="100%" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
     g + '<path d="' + area + '" fill="url(#' + gid + ')"/>' +
     '<path class="ln" d="' + line + '"/>' + dots + tag + lbl + '</svg>';
 }
@@ -1906,8 +1955,106 @@ document.addEventListener('visibilitychange', () => {
 });
 
 /* ============================================================
+   テーマ（設定画面）
+============================================================ */
+const TKEY = 'kintore.theme';
+
+// 背景セット。カード・ナビ・シートまで含めて一式で切り替える
+const BASES = {
+  midnight: { name: 'ミッドナイト', v: {
+    '--bg': '#0a0d13', '--panel': '#141924', '--panel2': '#1b2130', '--line': '#252d3d',
+    '--fg': '#e9eef7', '--muted': '#7e8a9e', '--card1': '#171d2a', '--card2': '#131824',
+    '--nav1': '#161c29', '--nav2': '#10141d', '--head1': '#111725',
+    '--exh1': '#1e2534', '--exh2': '#1a2130', '--sheet1': '#1a2130', '--grip': '#3a4459',
+    '--grid': '#222a37', '--axis': '#8d99ac', '--inset': 'inset 0 1px 0 rgba(255,255,255,.045)',
+  }},
+  charcoal: { name: 'チャコール', v: {
+    '--bg': '#0f0f10', '--panel': '#191919', '--panel2': '#212122', '--line': '#2e2e30',
+    '--fg': '#ededed', '--muted': '#8b8b8f', '--card1': '#1c1c1e', '--card2': '#161617',
+    '--nav1': '#1b1b1d', '--nav2': '#121213', '--head1': '#171718',
+    '--exh1': '#242426', '--exh2': '#1e1e20', '--sheet1': '#242426', '--grip': '#4a4a4e',
+    '--grid': '#2a2a2c', '--axis': '#95959a', '--inset': 'inset 0 1px 0 rgba(255,255,255,.05)',
+  }},
+  paper: { name: 'ライト', v: {
+    '--bg': '#f2f4f8', '--panel': '#ffffff', '--panel2': '#eef1f6', '--line': '#dbe1ea',
+    '--fg': '#151a22', '--muted': '#697588', '--card1': '#ffffff', '--card2': '#f8fAfc',
+    '--nav1': '#ffffff', '--nav2': '#f4f6fa', '--head1': '#ffffff',
+    '--exh1': '#f4f6fa', '--exh2': '#eef1f6', '--sheet1': '#ffffff', '--grip': '#c6cedb',
+    '--grid': '#e2e7ef', '--axis': '#5f6b7d', '--inset': 'inset 0 1px 0 rgba(255,255,255,.7)',
+  }},
+};
+
+// アクセント。a→b のグラデーションが主要数値とボタンに乗る
+const ACCENTS = {
+  ice:    { name: 'アイス',   a: '#7dd3fc', b: '#a3e635', mid: '#a5f3fc' },
+  ember:  { name: 'エンバー', a: '#fb923c', b: '#f472b6', mid: '#fbbf24' },
+  violet: { name: 'バイオレット', a: '#a78bfa', b: '#22d3ee', mid: '#c4b5fd' },
+  crimson:{ name: 'クリムゾン', a: '#f87171', b: '#fb923c', mid: '#fca5a5' },
+  forest: { name: 'フォレスト', a: '#34d399', b: '#a3e635', mid: '#6ee7b7' },
+  mono:   { name: 'モノクロ', a: '#cbd5e1', b: '#94a3b8', mid: '#e2e8f0' },
+};
+
+let theme;
+try { theme = JSON.parse(localStorage.getItem(TKEY)) || {}; } catch (e) { theme = {}; }
+if (!BASES[theme.base]) theme.base = 'midnight';
+if (!ACCENTS[theme.accent]) theme.accent = 'ice';
+
+const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+function applyTheme() {
+  const root = document.documentElement.style;
+  const b = BASES[theme.base].v;
+  for (const k in b) root.setProperty(k, b[k]);
+  const a = ACCENTS[theme.accent];
+  root.setProperty('--accent', a.a);
+  root.setProperty('--accent2', a.b);
+  root.setProperty('--grad', 'linear-gradient(135deg,' + a.a + ' 0%,' + a.mid + ' 45%,' + a.b + ' 100%)');
+  const meta = document.querySelector('meta[name=theme-color]');
+  if (meta) meta.setAttribute('content', b['--bg']);
+  localStorage.setItem(TKEY, JSON.stringify(theme));
+}
+
+function renderThemePicker() {
+  $('#accentList').innerHTML = Object.keys(ACCENTS).map(k => {
+    const a = ACCENTS[k];
+    return '<button class="sw' + (theme.accent === k ? ' on' : '') + '" data-accent="' + k + '">' +
+      '<span class="bar2" style="background:linear-gradient(135deg,' + a.a + ',' + a.mid + ',' + a.b + ')"></span>' +
+      a.name + '</button>';
+  }).join('');
+  $('#baseList').innerHTML = Object.keys(BASES).map(k => {
+    const b = BASES[k].v;
+    return '<button class="sw' + (theme.base === k ? ' on' : '') + '" data-base="' + k + '">' +
+      '<span class="bar2" style="background:linear-gradient(135deg,' + b['--bg'] + ' 0%,' + b['--panel2'] + ' 100%);' +
+      'border:1px solid ' + b['--line'] + '"></span>' + BASES[k].name + '</button>';
+  }).join('');
+}
+
+// 色を変えたらグラフは描き直す（SVG は生成時の色を持つため）
+function repaintTheme() {
+  applyTheme(); renderThemePicker();
+  if (curView === 'stats') renderStats();
+  if (curView === 'home' || curView === 'hist') showView(curView);
+  if ($('#mChart').classList.contains('open')) renderChartSheet();
+}
+
+$('#btnSettings').addEventListener('click', () => { renderThemePicker(); openModal('#mSettings'); });
+$('#accentList').addEventListener('click', e => {
+  const b = e.target.closest('[data-accent]'); if (!b) return;
+  theme.accent = b.dataset.accent; repaintTheme();
+});
+$('#baseList').addEventListener('click', e => {
+  const b = e.target.closest('[data-base]'); if (!b) return;
+  theme.base = b.dataset.base; repaintTheme();
+});
+$('#btnThemeReset').addEventListener('click', () => {
+  theme = { base: 'midnight', accent: 'ice' };
+  repaintTheme(); toast('既定の配色に戻しました');
+});
+
+/* ============================================================
    起動
 ============================================================ */
+applyTheme();
 $('#ghToken').value = gh.token;
 $('#ghGist').value = gh.gistId;
 $('#ghAuto').checked = gh.auto;
