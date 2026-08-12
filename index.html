@@ -468,23 +468,35 @@
     <div class="subview" id="stBody" style="display:none">
       <div class="card">
         <div class="row" style="align-items:flex-end">
-          <div style="flex:1.1"><label class="fld">体重 (kg)</label>
-            <input type="number" inputmode="decimal" step="0.1" id="bwInput" placeholder="例 68.4"></div>
-          <div style="flex:1.3"><label class="fld">日付</label>
+          <div style="flex:1"><label class="fld">体重 (kg)</label>
+            <input type="number" inputmode="decimal" step="0.1" id="bwInput" placeholder="68.4"></div>
+          <div style="flex:1"><label class="fld">体脂肪率 (%)</label>
+            <input type="number" inputmode="decimal" step="0.1" id="bfInput" placeholder="18.2"></div>
+          <div style="flex:1"><label class="fld">筋肉量 (kg)</label>
+            <input type="number" inputmode="decimal" step="0.1" id="mmInput" placeholder="52.0"></div>
+        </div>
+        <div class="row" style="margin-top:8px;align-items:flex-end">
+          <div style="flex:1"><label class="fld">日付</label>
             <input type="date" id="bwDate"></div>
-          <button class="btn primary" id="bwSave">記録</button>
+          <button class="btn primary" id="bwSave" style="flex:0 0 auto">記録</button>
         </div>
       </div>
       <div class="card">
+        <div class="chips" id="bodyMetrics" style="margin:0 0 8px">
+          <button class="chip on" data-bm="w">体重</button>
+          <button class="chip" data-bm="f">体脂肪率</button>
+          <button class="chip" data-bm="m">筋肉量</button>
+          <button class="chip" data-bm="l">除脂肪体重</button>
+        </div>
         <div class="stats-grid">
-          <div class="stat"><b id="bwNow" class="gradnum">—</b><span>最新 kg</span></div>
-          <div class="stat"><b id="bwDelta">—</b><span>30日差 kg</span></div>
+          <div class="stat"><b id="bwNow" class="gradnum">—</b><span id="bwNowLbl">最新</span></div>
+          <div class="stat"><b id="bwDelta">—</b><span>30日差</span></div>
           <div class="stat"><b id="bwBmi">—</b><span>BMI</span></div>
         </div>
         <div id="bwNote" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px"></div>
       </div>
       <div class="card chartcard" style="margin-bottom:0">
-        <h2>体重の推移</h2>
+        <h2 id="bwChartTitle">体重の推移</h2>
         <div id="bwChart" class="chartbox"></div>
       </div>
     </div>
@@ -1843,8 +1855,10 @@ function renderStats() {
 }
 
 let metric = 'e1rm';
-$$('#v-stats .chip').forEach(c => c.addEventListener('click', () => {
-  $$('#v-stats .chip').forEach(x => x.classList.toggle('on', x === c));
+// 指標チップだけを対象にする。#v-stats 全体の .chip を拾うと
+// サブタブや体組成の切替まで巻き込んで選択状態が壊れる。
+$$('#v-stats [data-metric]').forEach(c => c.addEventListener('click', () => {
+  $$('#v-stats [data-metric]').forEach(x => x.classList.toggle('on', x === c));
   metric = c.dataset.metric;
   renderExChart();
 }));
@@ -1972,15 +1986,24 @@ $$('[data-cmetric]').forEach(c => c.addEventListener('click', () => {
 ============================================================ */
 const bodySorted = () => db.body.slice().sort((a, b) => a.date < b.date ? -1 : 1);
 
-function setBodyWeight(date, w) {
-  const v = num(w);
+// 体重・体脂肪率・筋肉量をまとめて1日ぶんとして保存する
+function setBodyEntry(date, vals) {
+  const clean = {};
+  for (const k of ['w', 'f', 'm']) {
+    const v = num(vals[k]);
+    if (v > 0) clean[k] = String(v);
+  }
   const i = db.body.findIndex(b => b.date === date);
-  if (!(v > 0)) {                       // 空で保存したらその日の記録を削除
+  if (!Object.keys(clean).length) {      // 全部空なら削除
     if (i >= 0) { db.body.splice(i, 1); db.tomb.b[date] = nowISO(); }
     return false;
   }
-  if (i >= 0) { db.body[i].w = String(v); db.body[i].u = nowISO(); }
-  else db.body.push({ id: date, date, w: String(v), u: nowISO() });
+  if (i >= 0) {
+    for (const k of ['w', 'f', 'm']) { if (clean[k]) db.body[i][k] = clean[k]; else delete db.body[i][k]; }
+    db.body[i].u = nowISO();
+  } else {
+    db.body.push(Object.assign({ id: date, date, u: nowISO() }, clean));
+  }
   delete db.tomb.b[date];
   return true;
 }
@@ -1992,12 +2015,27 @@ function bmiLabel(bmi) {
        : bmi < 40 ? '肥満(3度)' : '肥満(4度)';
 }
 
+// 除脂肪体重 = 体重 - 脂肪。体重と体脂肪率が両方ないと出せない
+const leanOf = b => (num(b.w) > 0 && num(b.f) > 0) ? num(b.w) * (1 - num(b.f) / 100) : 0;
+const BODY_METRICS = {
+  w: { label: '体重', unit: 'kg', get: b => num(b.w) },
+  f: { label: '体脂肪率', unit: '%', get: b => num(b.f) },
+  m: { label: '筋肉量', unit: 'kg', get: b => num(b.m) },
+  l: { label: '除脂肪体重', unit: 'kg', get: leanOf },
+};
+let bodyMetric = 'w';
+
 function renderBody() {
-  const list = bodySorted();
+  const mt = BODY_METRICS[bodyMetric];
+  const all = bodySorted();
+  const list = all.filter(b => mt.get(b) > 0);      // その指標を記録した日だけ
   const last = list[list.length - 1];
+  const lastAny = all[all.length - 1];
   const h = num(db.profile.height);
 
-  $('#bwNow').textContent = last ? num(last.w).toFixed(1) : '—';
+  $('#bwNowLbl').textContent = '最新 ' + mt.unit;
+  $('#bwChartTitle').textContent = mt.label + 'の推移';
+  $('#bwNow').textContent = last ? mt.get(last).toFixed(1) : '—';
 
   // 30日前に最も近い記録との差
   let delta = '—';
@@ -2008,37 +2046,60 @@ function renderBody() {
     for (const b of list) if (b.date <= target) ref = b;
     if (!ref) ref = list[0];
     if (ref !== last) {
-      const d = num(last.w) - num(ref.w);
+      const d = mt.get(last) - mt.get(ref);
       delta = (d > 0 ? '+' : '') + d.toFixed(1);
     }
   }
   $('#bwDelta').textContent = delta;
 
-  const bmi = (last && h > 0) ? num(last.w) / Math.pow(h / 100, 2) : 0;
+  // BMI は常に最新の体重から
+  const lastW = all.filter(b => num(b.w) > 0).pop();
+  const bmi = (lastW && h > 0) ? num(lastW.w) / Math.pow(h / 100, 2) : 0;
   $('#bwBmi').textContent = bmi ? bmi.toFixed(1) : '—';
-  $('#bwNote').textContent = !last ? '体重を記録すると推移と BMI が出ます'
-    : !(h > 0) ? 'BMI は設定（⚙）で身長を入れると計算されます'
-    : '身長 ' + h + ' cm ・ ' + bmiLabel(bmi) + ' ・ 記録 ' + list.length + '件';
 
-  const box = $('#bwChart');
-  const pts = list.map(b => ({ label: mdLabel(b.date), date: b.date, v: num(b.w) }));
-  pts.unit = 'kg';
-  drawInto(box, pts.slice(-40));
+  const parts = [];
+  if (h > 0 && bmi) parts.push('身長 ' + h + 'cm ・ ' + bmiLabel(bmi));
+  else if (lastW) parts.push('BMI は設定（⚙）で身長を入れると出ます');
+  if (lastAny) {
+    const lean = leanOf(lastAny);
+    if (lean > 0) parts.push('除脂肪体重 ' + lean.toFixed(1) + 'kg');
+    parts.push('記録 ' + all.length + '件');
+  }
+  $('#bwNote').textContent = !all.length
+    ? '体重・体脂肪率・筋肉量を記録すると推移が出ます'
+    : !list.length ? mt.label + 'の記録がまだありません'
+    : parts.join(' ・ ');
+
+  const pts = list.map(b => ({ label: mdLabel(b.date), date: b.date, v: mt.get(b) }));
+  pts.unit = mt.unit;
+  drawInto($('#bwChart'), pts.slice(-40));
 
   if (!$('#bwDate').value) $('#bwDate').value = today();
-  const onDate = db.body.find(b => b.date === $('#bwDate').value);
-  $('#bwInput').value = onDate ? num(onDate.w) : '';
+  fillBodyInputs();
 }
 
-$('#bwDate').addEventListener('change', () => {
-  const onDate = db.body.find(b => b.date === $('#bwDate').value);
-  $('#bwInput').value = onDate ? num(onDate.w) : '';
+// 選んだ日の記録を入力欄に戻す
+function fillBodyInputs() {
+  const b = db.body.find(x => x.date === $('#bwDate').value) || {};
+  $('#bwInput').value = num(b.w) || '';
+  $('#bfInput').value = num(b.f) || '';
+  $('#mmInput').value = num(b.m) || '';
+}
+
+$('#bodyMetrics').addEventListener('click', e => {
+  const b = e.target.closest('[data-bm]'); if (!b) return;
+  bodyMetric = b.dataset.bm;
+  $$('#bodyMetrics .chip').forEach(c => c.classList.toggle('on', c === b));
+  renderBody();
 });
+$('#bwDate').addEventListener('change', fillBodyInputs);
 $('#bwSave').addEventListener('click', () => {
   const date = $('#bwDate').value || today();
-  const kept = setBodyWeight(date, $('#bwInput').value);
+  const kept = setBodyEntry(date, {
+    w: $('#bwInput').value, f: $('#bfInput').value, m: $('#mmInput').value,
+  });
   save(); renderBody();
-  toast(kept ? mdLabel(date) + ' の体重を記録しました' : mdLabel(date) + ' の記録を削除しました');
+  toast(kept ? mdLabel(date) + ' の記録を保存しました' : mdLabel(date) + ' の記録を削除しました');
 });
 $('#heightSave').addEventListener('click', () => {
   const v = num($('#heightInput').value);
