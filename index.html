@@ -80,7 +80,9 @@
     padding:7px 4px 8px; font-size:calc(10px * var(--fs)); display:flex;
     flex-direction:column; align-items:center; gap:2px; letter-spacing:.02em;
   }
-  nav button .ic{font-size:calc(18px * var(--fs)); line-height:1; opacity:.6; transition:opacity .15s}
+  nav button .ic{line-height:0; opacity:.62; transition:opacity .15s}
+  nav button .ic svg{width:23px; height:23px; display:block; stroke:currentColor; fill:none;
+    stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round}
   nav button.active{color:var(--accent)}
   nav button.active .ic{opacity:1}
   /* 選択中のタブに上部インジケータ */
@@ -102,6 +104,7 @@
     background:var(--panel2); border:1px solid var(--line); color:var(--fg);
     border-radius:11px; padding:10px 14px; font-size:calc(14px * var(--fs)); font-weight:600;
     transition:transform .08s, filter .15s; box-shadow:var(--inset);
+    white-space:nowrap;          /* 幅が足りないと1文字ずつ折り返してしまうため */
   }
   .btn:active{transform:scale(.97); filter:brightness(1.12)}
   .btn.primary{
@@ -110,7 +113,8 @@
   }
   .btn.has-memo{border-color:var(--accent2); color:var(--accent2)}
   .btn.ghost{background:transparent}
-  .btn.danger{color:var(--danger); border-color:color-mix(in srgb, var(--danger) 32%, var(--line))}
+  .btn.danger{color:var(--danger); border-color:var(--line); background:transparent; box-shadow:none}
+  .btn.danger:active{background:color-mix(in srgb, var(--danger) 18%, transparent)}
   .btn.block{width:100%; justify-content:center; display:flex}
   .btn.lg{padding:14px; font-size:calc(16px * var(--fs))}
   .btn.sm{padding:6px 10px; font-size:calc(13px * var(--fs)); border-radius:8px}
@@ -164,6 +168,7 @@
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
 
   .empty{text-align:center; color:var(--muted); padding:24px 10px; font-size:calc(13px * var(--fs))}
+  .fillcenter{flex:1; min-height:0; display:flex; align-items:center; justify-content:center}
 
   /* 記録ページ下部のサマリー行 */
   .daybar{
@@ -205,13 +210,17 @@
     display:flex; align-items:center; justify-content:center; padding:0;
     font-size:calc(12px * var(--fs)); font-variant-numeric:tabular-nums; color:var(--fg);
   }
-  .cal-grid.wide .cal-d{max-width:40px; font-size:calc(14px * var(--fs))}
+  .cal-grid.wide .cal-d{max-width:34px; font-size:calc(13px * var(--fs))}
   .cal-d.other{color:color-mix(in srgb, var(--muted) 62%, transparent)}
   .cal-d.sun{color:#e08a8a} .cal-d.sat{color:#8fb6d4}
   .cal-d.other.sun,.cal-d.other.sat{color:color-mix(in srgb, var(--muted) 62%, transparent)}
   /* 記録がある日の配色は部位ごとの色を JS が inline で当てる（選択日には当てない） */
   .cal-d.has{font-weight:700}
-  .cal-d.today{border-color:var(--accent); color:var(--accent)}
+  /* 今日は下の点で示す。枠にすると部位色のリングと見分けがつかない */
+  .cal-d{position:relative}
+  .cal-d.today::after{content:''; position:absolute; left:50%; bottom:1px; width:4px; height:4px;
+    margin-left:-2px; border-radius:50%; background:var(--accent)}
+  .cal-d.sel.today::after{background:var(--on-accent)}
   .cal-d.sel{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700}
 
   /* --- ホイール入力 --- */
@@ -255,9 +264,9 @@
     max-height:3.6em; overflow:auto;
   }
 
-  .subview{flex:1; min-height:0; display:flex; flex-direction:column}
+  .subview{flex:1; min-height:0; display:flex; flex-direction:column; overflow-y:auto}
   .chartcard{display:flex; flex-direction:column; min-height:0; flex:1}
-  .chartbox{flex:1; min-height:80px; display:flex; margin-top:6px}
+  .chartbox{flex:1; min-height:96px; display:flex; margin-top:6px}
   svg.chart{width:100%; height:100%; display:block}
   svg .grid{stroke:var(--grid); stroke-width:1}
   svg .axis{fill:var(--axis); font-size:calc(11px * var(--fs)); font-variant-numeric:tabular-nums}
@@ -389,16 +398,21 @@
       <button class="btn primary lg" id="btnStart" style="flex:1">
         <span id="startLabel">＋ 本日のトレーニングを追加</span>
       </button>
-      <button class="btn lg" id="btnCalc" style="flex:0 0 52px" title="計算機">🧮</button>
+      <button class="btn lg" id="btnCalc" style="flex:0 0 auto">計算</button>
     </div>
 
     <div class="card" style="margin-bottom:0">
       <div class="stats-grid">
         <div class="stat"><b id="sToday">0</b><span>総ボリューム kg</span></div>
-        <div class="stat"><b id="sSets">0</b><span>完了セット</span></div>
+        <div class="stat"><b id="sSets">0</b><span>記録セット</span></div>
         <div class="stat"><b id="sEx">0</b><span>種目数</span></div>
       </div>
-      <div id="homeHint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:8px"></div>
+      <div id="homeHint" style="font-size:11px;color:var(--muted);text-align:center;margin-top:6px"></div>
+    </div>
+
+    <div class="card" style="display:flex;flex-direction:column;min-height:0;flex:1;margin-bottom:0">
+      <h2>最近の記録</h2>
+      <div class="scroll" id="recentList"></div>
     </div>
   </section>
 
@@ -423,7 +437,7 @@
     <div class="memoline" id="logMemo"></div>
     <div class="daybar" id="logBar"></div>
     <div class="row">
-      <button class="btn lg" id="btnMemo" style="flex:0 0 52px">📝</button>
+      <button class="btn lg" id="btnMemo" style="flex:0 0 auto">メモ</button>
       <button class="btn primary lg" id="btnAddEx" style="flex:1">＋ 種目を追加</button>
     </div>
   </section>
@@ -511,12 +525,12 @@
       </div>
     </div>
 
-    <div class="card chartcard">
+    <div class="card chartcard" style="flex:0.85">
       <h2>週別 総ボリューム (kg)</h2>
       <div id="volChart" class="chartbox"></div>
     </div>
 
-    <div class="card chartcard" style="margin-bottom:0">
+    <div class="card chartcard" style="margin-bottom:0;flex:1.15">
       <h2>種目別の推移</h2>
       <div class="row">
         <select id="statEx" style="flex:1"></select>
@@ -527,7 +541,7 @@
         <button class="chip" data-metric="vol">ボリューム</button>
       </div>
       <div id="exChart" class="chartbox"></div>
-      <div id="exBest" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+      <div id="exBest" style="font-size:11px;color:var(--muted);margin-top:2px"></div>
     </div>
     </div>
   </section>
@@ -538,11 +552,10 @@
       <h2>種目を追加</h2>
       <div class="row">
         <input type="text" id="newExName" placeholder="種目名">
-        <select id="newExCat" style="width:100px"></select>
         <button class="btn primary" id="btnNewEx">追加</button>
       </div>
       <div class="row" style="margin-top:8px">
-        <span style="font-size:12px;color:var(--muted);white-space:nowrap">記録形式</span>
+        <select id="newExCat" style="flex:0 0 96px"></select>
         <select id="newExKind">
           <option value="weight">重量×回数</option>
           <option value="bw">回数のみ（自重）</option>
@@ -562,10 +575,10 @@
 </main>
 
 <nav>
-  <button class="active" data-view="home"><span class="ic">🏠</span>ホーム</button>
-  <button data-view="hist"><span class="ic">📅</span>履歴</button>
-  <button data-view="stats"><span class="ic">📈</span>分析</button>
-  <button data-view="ex"><span class="ic">⚙️</span>種目</button>
+  <button class="active" data-view="home"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 11.2 12 4l9 7.2V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></svg></span>ホーム</button>
+  <button data-view="hist"><span class="ic"><svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></span>履歴</button>
+  <button data-view="stats"><span class="ic"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16"/><path d="m7 15 4-5 3.5 3L20 7"/></svg></span>分析</button>
+  <button data-view="ex"><span class="ic"><svg viewBox="0 0 24 24"><path d="M3 9.5v5M6.5 7v10M17.5 7v10M21 9.5v5M6.5 12h11"/></svg></span>種目</button>
 </nav>
 
 <!-- 種目ピッカー -->
@@ -959,6 +972,8 @@ function weekStart(dateStr) {
   return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
 }
 const mdLabel = ds => ds.slice(5).replace('-', '/');
+// 一覧用。曜日があると「いつやったか」が掴みやすい
+const dateLabel = ds => mdLabel(ds) + '(' + ['日','月','火','水','木','金','土'][new Date(ds + 'T00:00:00').getDay()] + ')';
 
 /* ============================================================
    セッション取得
@@ -1066,7 +1081,7 @@ function nextGoal(exId, date) {
   return { w: s.w, r: s.r + 1, text: s.w + 'kg×' + (s.r + 1) };
 }
 
-// その日より前で、その種目を最後にやったセッションの完了セット
+// その日より前で、その種目を最後にやったセッションの記録済みセット
 function prevSets(exId, beforeDate) {
   const cands = db.sessions
     .filter(s => s.date < beforeDate)
@@ -1113,7 +1128,7 @@ function showView(v) {
   const tab = v === 'log' ? 'home' : v;
   $$('nav button').forEach(x => x.classList.toggle('active', x.dataset.view === tab));
   $('#btnBack').style.display = v === 'log' ? '' : 'none';
-  $('#hdr').textContent = v === 'log' ? mdLabel(curDate) + ' の記録' : TITLES[v];
+  $('#hdr').textContent = v === 'log' ? dateLabel(curDate) + ' の記録' : TITLES[v];
 
   if (v === 'home') renderHome();
   if (v === 'log') renderLog();
@@ -1133,7 +1148,7 @@ function renderLog() {
   const body = $('#logBody');
 
   if (!sess || !sess.entries.length) {
-    body.innerHTML = '<div class="card"><div class="empty">まだ種目がありません。<br>下のボタンから追加してください。</div></div>';
+    body.innerHTML = '<div class="fillcenter"><div class="empty">まだ種目がありません。<br>下のボタンから追加してください。</div></div>';
   } else {
     body.innerHTML = sess.entries.map((en, ei) => {
       const ex = exById(en.exId) || { name: exName(en.exId), cat: '' };
@@ -1382,8 +1397,29 @@ function renderHome() {
     : mdLabel(curDate) + ' のトレーニングを' + (sess ? '編集' : '追加');
   $('#homeHint').textContent = isToday
     ? '選択中：今日'
-    : '選択中：' + curDate + '（カレンダーで日付を変えられます）';
+    : '選択中：' + dateLabel(curDate) + '（カレンダーで日付を変えられます）';
+  renderRecent();
 }
+// ホーム下部。空きスペースを直近の記録で埋めて、そこから編集にも飛べるようにする
+function renderRecent() {
+  const ss = db.sessions.filter(s => s.entries.length)
+    .sort((a, b) => a.date < b.date ? 1 : -1).slice(0, 20);
+  $('#recentList').innerHTML = ss.length ? ss.map(s => {
+    const cs = Array.from(sessionCats(s))
+      .map(c => '<span style="color:' + (CAT_COLOR[c] || '#94a3b8') + '">' + esc(c) + '</span>').join(' ');
+    return '<div class="list-item" data-recent="' + s.date + '">' +
+      '<div class="t"><b>' + dateLabel(s.date) + (s.memo ? ' 📝' : '') + '</b>' +
+      '<span>' + cs + ' ／ ' + loggedSets(s) + 'セット</span></div>' +
+      '<div style="font-size:calc(12px * var(--fs));color:var(--muted);white-space:nowrap">' +
+      fmt(sessionVolume(s)) + ' kg</div></div>';
+  }).join('') : '<div class="empty">まだ記録がありません。<br>上のボタンから始めましょう。</div>';
+}
+$('#recentList').addEventListener('click', e => {
+  const it = e.target.closest('[data-recent]'); if (!it) return;
+  curDate = it.dataset.recent;
+  calCursor = curDate.slice(0, 7);
+  showView('log');
+});
 $('#btnStart').addEventListener('click', () => showView('log'));
 
 // 入力（値の変更）
@@ -1479,7 +1515,7 @@ $('#logBody').addEventListener('click', e => {
 $('#logDate').addEventListener('change', e => {
   curDate = e.target.value || today();
   calCursor = curDate.slice(0, 7);
-  $('#hdr').textContent = mdLabel(curDate) + ' の記録';
+  $('#hdr').textContent = dateLabel(curDate) + ' の記録';
   renderLog();
 });
 
@@ -1748,7 +1784,7 @@ function renderHist() {
     const memo = s.memo ? '<div class="memoline" style="margin:6px 0 0">' + esc(s.memo) + '</div>' : '';
     return '<div>' +
       '<div class="list-item" data-date="' + s.date + '">' +
-        '<div class="t"><b>' + s.date + (s.memo ? ' 📝' : '') + '</b><span>' + cs + ' ／ ' +
+        '<div class="t"><b>' + dateLabel(s.date) + (s.memo ? ' 📝' : '') + '</b><span>' + cs + ' ／ ' +
           loggedSets(s) + 'セット ／ ' + fmt(sessionVolume(s)) + ' kg</span></div>' +
         '<button class="btn sm ghost" data-act="open">編集</button>' +
         '<button class="btn sm danger" data-act="del">削除</button>' +
@@ -1965,7 +2001,7 @@ function renderChartSheet() {
     const en = s.entries.find(e => e.exId === chExId); if (!en) continue;
     const done = en.sets.filter(filled);
     if (!done.length) continue;
-    rows.push('<div class="list-item"><div class="t"><b>' + s.date + '</b><span>' +
+    rows.push('<div class="list-item"><div class="t"><b>' + dateLabel(s.date) + '</b><span>' +
       esc(done.map(x => setLabel(x, kindOf(chExId))).join(' / ')) + '</span></div>' +
       '<div style="font-size:12px;color:var(--muted);white-space:nowrap">' +
       (isCardio(chExId) ? fmt(done.reduce((a, x) => a + num(x.t), 0)) + ' 分'
@@ -2144,7 +2180,8 @@ function niceStep(raw) {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * mag;
 }
 // 棒グラフは0起点。折れ線は0起点だと数kgの伸びが潰れて見えないので自動範囲にする
-function axisOf(vals, fromZero) {
+function axisOf(vals, fromZero, ticks) {
+  const n = ticks || 4;
   let lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
   if (fromZero) lo = 0;
   if (hi === lo) { const d = Math.abs(hi) * 0.1 || 1; hi += d; if (!fromZero) lo -= d; }
@@ -2152,10 +2189,12 @@ function axisOf(vals, fromZero) {
     const pad = (hi - lo) * 0.18; lo -= pad; hi += pad;
     if (lo < 0 && Math.min.apply(null, vals) >= 0) lo = 0;
   }
-  const step = niceStep((hi - lo) / 4);
+  const step = niceStep((hi - lo) / n);
   return { lo: Math.floor(lo / step) * step, hi: Math.ceil(hi / step) * step, step };
 }
 const axText = (v, step) => step < 1 ? v.toFixed(1) : Math.round(v).toLocaleString('ja-JP');
+// 低いグラフに目盛りを詰めるとラベルが重なるので本数を減らす
+const tickCount = h => h < 80 ? 2 : h < 130 ? 3 : 4;
 const xTicks = n => {
   const want = Math.min(n, 5);
   if (n <= 1) return [0];
@@ -2179,7 +2218,7 @@ function gridAndAxis(a, PL, PR, PT, PB, W, H) {
 function lineChart(pts, box) {
   const { W, H } = chartSize(box);
   const PL = 46, PR = 14, PT = 18, PB = 28;
-  const a = axisOf(pts.map(p => p.v), false);
+  const a = axisOf(pts.map(p => p.v), false, tickCount(H - PT - PB));
   const { g, y } = gridAndAxis(a, PL, PR, PT, PB, W, H);
   const x = i => PL + (W - PL - PR) * (pts.length === 1 ? .5 : i / (pts.length - 1));
 
@@ -2211,7 +2250,7 @@ function lineChart(pts, box) {
 function barChart(pts, box) {
   const { W, H } = chartSize(box);
   const PL = 46, PR = 14, PT = 18, PB = 28;
-  const a = axisOf(pts.map(p => p.v), true);
+  const a = axisOf(pts.map(p => p.v), true, tickCount(H - PT - PB));
   const { g, y } = gridAndAxis(a, PL, PR, PT, PB, W, H);
   const iw = (W - PL - PR) / pts.length;
   const bw = Math.max(5, Math.min(26, iw * 0.62));
@@ -2803,7 +2842,7 @@ function renderPr() {
     return '<div class="list-item">' +
       '<span style="color:' + c + '">●</span>' +
       '<div class="t"><b>' + (isNew ? '🏆 ' : '') + esc(r.ex.name) + '</b>' +
-      '<span>' + esc(r.b.date) + (r.b.sub ? ' ／ ' + esc(r.b.sub) : '') + '</span></div>' +
+      '<span>' + esc(dateLabel(r.b.date)) + (r.b.sub ? ' ／ ' + esc(r.b.sub) : '') + '</span></div>' +
       '<div style="font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums">' + esc(r.b.main) + '</div>' +
     '</div>';
   }).join('') : '<div class="empty">記録のある種目がありません。</div>';
