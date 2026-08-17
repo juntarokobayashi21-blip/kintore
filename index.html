@@ -146,6 +146,17 @@
   .delta.down{background:color-mix(in srgb, var(--danger) 18%, transparent); color:var(--danger)}
   .pr-badge{font-size:calc(15px * var(--fs)); line-height:1; flex:0 0 auto}
   .goal-line{padding:6px 14px 0}
+  /* 種目に紐づく自分用メモ。記録中に常に見える位置に出す */
+  .exnote{
+    margin:8px 12px 0; padding:6px 10px; border-left:2px solid var(--accent);
+    border-radius:0 8px 8px 0; background:var(--panel2);
+    font-size:calc(12px * var(--fs)); color:var(--fg); white-space:pre-wrap; word-break:break-word;
+  }
+  .tipbtn.hasnote{border-color:var(--accent); color:var(--accent)}
+  .ex-head .name{cursor:pointer}
+  .nametip{display:inline-block; margin-left:6px; width:16px; height:16px; line-height:16px;
+    border-radius:50%; border:1px solid var(--line); color:var(--muted);
+    font-size:calc(10px * var(--fs)); text-align:center; vertical-align:middle; font-weight:700}
   .goal{
     background:color-mix(in srgb, var(--accent) 14%, transparent);
     border:1px dashed var(--accent); color:var(--accent);
@@ -672,7 +683,15 @@
   <div class="sheet">
     <h3 id="tipTitle">ポイント</h3>
     <div id="tipBody"></div>
-    <div class="tipnote">
+
+    <label class="fld" style="margin-top:14px">自分用メモ（マシンの設定など）</label>
+    <textarea id="exNote" rows="3" placeholder="シート高さ4 ／ ピン7枚目 ／ グリップは肩幅＋拳2つ"></textarea>
+    <div class="row" style="margin-top:8px">
+      <span id="exNoteHint" style="font-size:11px;color:var(--muted);flex:1"></span>
+      <button class="btn sm primary" id="exNoteSave">メモを保存</button>
+    </div>
+
+    <div class="tipnote" style="margin-top:14px">
       一般的な注意点です。痛みや違和感が出たら中止してください。
       持病や既往がある場合、また高重量を扱う場合は、専門家の指導を受けることをおすすめします。
     </div>
@@ -895,6 +914,7 @@ function normalize(d) {
   for (const e of d.exercises) {
     if (!e.u) e.u = '';
     // bw 未設定の既存データは、既定の自重種目リストから補う
+    if (typeof e.note !== 'string') e.note = '';
     if (!KINDS[e.kind]) {
       // 旧 bw フラグからの移行。未設定なら種目名とカテゴリから推定する
       e.kind = e.bw === true ? (defaultKind(e.name, e.cat) === 'cardio' ? 'cardio' : 'bw')
@@ -1190,7 +1210,8 @@ function renderLog() {
       return '<div class="ex-block">' +
         '<div class="ex-head">' +
           (pr.isPr ? '<span class="pr-badge" title="自己ベスト更新">🏆</span>' : '') +
-          '<div class="name">' + esc(ex.name) + '</div>' +
+          '<div class="name" data-act="tips" data-e="' + ei + '" title="ポイントと自分用メモ">' +
+            esc(ex.name) + '<span class="nametip">?</span></div>' +
           (ex.cat ? '<div class="cat">' + esc(ex.cat) + '</div>' : '') +
           '<button class="btn sm ghost" data-act="tips" data-e="' + ei + '" title="ポイントを見る">?</button>' +
           '<button class="btn sm ghost" data-act="chart" data-e="' + ei + '" title="推移を見る">📈</button>' +
@@ -1198,6 +1219,7 @@ function renderLog() {
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + deltaTag + '</div>' +
         (goalTag ? '<div class="goal-line">' + goalTag + '</div>' : '') +
+        (ex.note ? '<div class="exnote" data-act="tips" data-e="' + ei + '">' + esc(ex.note) + '</div>' : '') +
         '<div class="sets">' +
           '<div class="set-head' + (bw ? ' bw' : '') + '"><div></div>' + (cardio ? '<div>時間(分)</div><div>距離(km)</div>' : (bw ? '' : '<div>重量(kg)</div>') + '<div>回数</div>') + '<div>追加</div><div></div></div>' +
           rows +
@@ -1498,6 +1520,10 @@ $('#logBody').addEventListener('click', e => {
     return;
   }
   if (act === 'tips') { openTips(sess.entries[+btn.dataset.e].exId); return; }
+  if (act === 'tips') {
+    openTips(sess.entries[+btn.dataset.e].exId);
+    return;
+  }
   if (act === 'chart') {
     openExChart(sess.entries[+btn.dataset.e].exId);
     return;
@@ -2288,7 +2314,7 @@ function renderExMaster() {
     '<div style="margin-bottom:10px"><div style="font-size:12px;color:var(--muted);margin:8px 0 2px">' + esc(c) + '</div>' +
     db.exercises.filter(e => e.cat === c).map(e =>
       '<div class="list-item"><div class="t"><b>' + esc(e.name) + '</b></div>' +
-      '<button class="tipbtn" data-tip="' + esc(e.id) + '" title="ポイントを見る">?</button>' +
+      '<button class="tipbtn' + (e.note ? ' hasnote' : '') + '" data-tip="' + esc(e.id) + '" title="ポイントと自分用メモ">?</button>' +
       '<button class="chip' + (e.kind !== 'weight' ? ' on' : '') + '" data-kind="' + esc(e.id) + '" title="記録形式を切り替える">' + KINDS[e.kind] + '</button>' +
       '<button class="btn sm danger" data-delex="' + esc(e.id) + '">削除</button></div>').join('') +
     '</div>').join('') || '<div class="empty">種目がありません。</div>';
@@ -2710,8 +2736,24 @@ function openTips(exId) {
     esc((ex.cat || '') + '　' + (KINDS[ex.kind] || '')) +
     (own ? '' : '（この種目の個別ヒントは未登録のため、部位の一般的な注意点を表示しています）') + '</div>' +
     '<ul class="tips">' + tipsFor(exId).map(t => '<li>' + esc(t) + '</li>').join('') + '</ul>';
+  tipExId = exId;
+  $('#exNote').value = ex.note || '';
+  $('#exNoteHint').textContent = ex.note ? '記録画面にも表示されます' : 'マシンの設定など、毎回同じ情報を残せます';
   openModal('#mTips');
 }
+
+// 種目に紐づく自分用メモ。日ごとのメモとは別で、毎回同じ情報を置く
+let tipExId = null;
+$('#exNoteSave').addEventListener('click', () => {
+  const ex = exById(tipExId); if (!ex) return;
+  const txt = $('#exNote').value.trim();
+  ex.note = txt; ex.u = nowISO();
+  save();
+  $('#exNoteHint').textContent = txt ? '記録画面にも表示されます' : 'マシンの設定など、毎回同じ情報を残せます';
+  closeModal('#mTips');
+  if (curView === 'log') renderLog(); else if (curView === 'ex') renderExMaster();
+  toast(txt ? ex.name + ' のメモを保存しました' : ex.name + ' のメモを削除しました');
+});
 
 /* ============================================================
    計算機（1RM換算 / プレート）
