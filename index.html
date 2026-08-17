@@ -154,9 +154,6 @@
   }
   .tipbtn.hasnote{border-color:var(--accent); color:var(--accent)}
   .ex-head .name{cursor:pointer}
-  .nametip{display:inline-block; margin-left:6px; width:16px; height:16px; line-height:16px;
-    border-radius:50%; border:1px solid var(--line); color:var(--muted);
-    font-size:calc(10px * var(--fs)); text-align:center; vertical-align:middle; font-weight:700}
   .goal{
     background:color-mix(in srgb, var(--accent) 14%, transparent);
     border:1px dashed var(--accent); color:var(--accent);
@@ -571,6 +568,7 @@
           <option value="weight">重量×回数</option>
           <option value="bw">回数のみ（自重）</option>
           <option value="cardio">時間・距離（有酸素）</option>
+          <option value="assist">補助重量×回数（アシストマシン）</option>
         </select>
       </div>
     </div>
@@ -838,8 +836,8 @@ const CATS = ['胸','背中','脚','肩','腕','体幹','有酸素','その他']
 
 const DEFAULT_EX = [
   ['ベンチプレス','胸'],['ダンベルプレス','胸'],['チェストプレス','胸'],
-  ['ダンベルフライ','胸'],['腕立て伏せ','胸'],
-  ['デッドリフト','背中'],['ラットプルダウン','背中'],['懸垂','背中'],
+  ['ダンベルフライ','胸'],['腕立て伏せ','胸'],['アシストディップス','胸'],
+  ['デッドリフト','背中'],['ラットプルダウン','背中'],['懸垂','背中'],['アシストチンニング','背中'],
   ['ベントオーバーロー','背中'],['シーテッドロー','背中'],
   ['スクワット','脚'],['レッグプレス','脚'],['レッグエクステンション','脚'],
   ['レッグカール','脚'],['ブルガリアンスクワット','脚'],['カーフレイズ','脚'],
@@ -851,12 +849,16 @@ const DEFAULT_EX = [
   ['ランニング','有酸素'],['エアロバイク','有酸素'],
 ];
 // 種目の記録形式。weight=重量×回数 / bw=回数のみ / cardio=時間・距離
-const KINDS = { weight: '重量', bw: '自重', cardio: '有酸素' };
+// assist はマシンの補助重量。少ないほど良いので、比較の向きが他と逆になる
+const KINDS = { weight: '重量', bw: '自重', cardio: '有酸素', assist: '補助' };
 const BW_DEFAULT = ['腕立て伏せ', '懸垂', 'アブローラー', 'プランク', 'レッグレイズ'];
 const CARDIO_DEFAULT = ['ランニング', 'エアロバイク'];
+const ASSIST_DEFAULT = ['アシストチンニング', 'アシストディップス'];
 const defaultKind = (name, cat) =>
   CARDIO_DEFAULT.includes(name) || cat === '有酸素' ? 'cardio'
+  : ASSIST_DEFAULT.includes(name) ? 'assist'
   : BW_DEFAULT.includes(name) ? 'bw' : 'weight';
+const isAssist = exId => kindOf(exId) === 'assist';
 const kindOf = exId => (exById(exId) || {}).kind || 'weight';
 const isBw = exId => kindOf(exId) === 'bw';
 const isCardio = exId => kindOf(exId) === 'cardio';
@@ -911,6 +913,11 @@ function normalize(d) {
     for (const ss of d.sessions) for (const en of ss.entries || []) en.exId = exMap[en.exId] || en.exId;
     d.v = 2;
   }
+  // 後から増えた既定種目を取り込む。自分で削除したものは墓標があるので戻さない
+  for (const [name, cat] of DEFAULT_EX) {
+    if (d.exercises.some(e => e.id === name) || d.tomb.e[name]) continue;
+    d.exercises.push({ id: name, name, cat, kind: defaultKind(name, cat), note: '', u: '' });
+  }
   for (const e of d.exercises) {
     if (!e.u) e.u = '';
     // bw 未設定の既存データは、既定の自重種目リストから補う
@@ -959,6 +966,7 @@ const setVol = s => num(s.w) * num(s.r);
 const filled = s => num(s.r) > 0 || num(s.t) > 0 || num(s.d) > 0;
 // 表示用のセット表記。自重種目は重量を出さない
 function setLabel(s, kind) {
+  if (kind === 'assist') return '補助' + num(s.w) + 'kg×' + num(s.r);
   if (kind === 'cardio') {
     const a = [];
     if (num(s.t) > 0) a.push(num(s.t) + '分');
@@ -970,7 +978,11 @@ function setLabel(s, kind) {
 
 function sessionVolume(sess) {
   let v = 0;
-  for (const en of sess.entries) for (const s of en.sets) if (filled(s)) v += setVol(s);
+  for (const en of sess.entries) {
+    // 自重・有酸素・補助は挙上量に足さない（補助重量を足すと逆の意味になる）
+    if (kindOf(en.exId) !== 'weight') continue;
+    for (const s of en.sets) if (filled(s)) v += setVol(s);
+  }
   return v;
 }
 function loggedSets(sess) {
@@ -1029,6 +1041,11 @@ function daySummaryOf(en, kind) {
     return { d: num(top.d), t: num(top.t) };
   }
   if (kind === 'bw') return { r: Math.max.apply(null, done.map(x => num(x.r))) };
+  if (kind === 'assist') {
+    // 補助は少ないほどきつい。最も軽い補助のセットを代表にする
+    const top = pick(x => -num(x.w) * 1000 + num(x.r));
+    return { w: num(top.w), r: num(top.r) };
+  }
   const top = pick(x => e1rm(num(x.w), num(x.r)));
   return { w: num(top.w), r: num(top.r), e: e1rm(num(top.w), num(top.r)) };
 }
@@ -1047,17 +1064,33 @@ function exDays(exId) {
 function deltaText(cur, prev, kind) {
   const d = (a, b) => Math.round((a - b) * 10) / 10;
   const sign = v => (v > 0 ? '+' : '') + v;
+  const mk = (v, unit, better) => ({ text: sign(v) + unit, good: better });
   if (kind === 'cardio') {
-    if (cur.d !== prev.d && (cur.d || prev.d)) return sign(d(cur.d, prev.d)) + 'km';
-    if (cur.t !== prev.t) return sign(d(cur.t, prev.t)) + '分';
-    return '';
+    if (cur.d !== prev.d && (cur.d || prev.d)) { const v = d(cur.d, prev.d); return mk(v, 'km', v > 0); }
+    if (cur.t !== prev.t) { const v = d(cur.t, prev.t); return mk(v, '分', v > 0); }
+    return null;
   }
-  if (kind === 'bw') return cur.r === prev.r ? '' : sign(d(cur.r, prev.r)) + '回';
-  if (cur.w !== prev.w) return sign(d(cur.w, prev.w)) + 'kg';
-  if (cur.r !== prev.r) return sign(d(cur.r, prev.r)) + '回';
-  return '';
+  if (kind === 'bw') {
+    if (cur.r === prev.r) return null;
+    const v = d(cur.r, prev.r); return mk(v, '回', v > 0);
+  }
+  if (kind === 'assist') {
+    // 補助が減っていれば進歩。符号はそのまま出しつつ、良し悪しは反転させる
+    if (cur.w !== prev.w) { const v = d(cur.w, prev.w); return mk(v, 'kg', v < 0); }
+    if (cur.r !== prev.r) { const v = d(cur.r, prev.r); return mk(v, '回', v > 0); }
+    return null;
+  }
+  if (cur.w !== prev.w) { const v = d(cur.w, prev.w); return mk(v, 'kg', v > 0); }
+  if (cur.r !== prev.r) { const v = d(cur.r, prev.r); return mk(v, '回', v > 0); }
+  return null;
 }
-const prMetric = (sum, kind) => kind === 'cardio' ? sum.d || sum.t : kind === 'bw' ? sum.r : sum.e;
+// 大きいほど良い1つの数値に揃える。補助は「軽いほど良い」ので反転させる
+const ASSIST_CAP = 200;
+const prMetric = (sum, kind) =>
+  kind === 'cardio' ? sum.d || sum.t
+  : kind === 'bw' ? sum.r
+  : kind === 'assist' ? (ASSIST_CAP - Math.min(sum.w, ASSIST_CAP)) * 1000 + sum.r
+  : sum.e;
 
 // 当日が自己ベストを更新しているか（過去日との比較）
 function prState(exId, date) {
@@ -1069,9 +1102,11 @@ function prState(exId, date) {
   if (!cur) return { prev, delta: '', isPr: false };
   const best = past.length ? Math.max.apply(null, past.map(x => prMetric(x.sum, kind))) : 0;
   const now = prMetric(cur.sum, kind);
+  const dt = prev ? deltaText(cur.sum, prev.sum, kind) : null;
   return {
     prev,
-    delta: prev ? deltaText(cur.sum, prev.sum, kind) : '',
+    delta: dt ? dt.text : '',
+    deltaGood: dt ? dt.good : false,
     isPr: now > 0 && now > best,
   };
 }
@@ -1092,6 +1127,14 @@ function nextGoal(exId, date) {
   if (kind === 'bw') {
     if (!(s.r > 0)) return null;
     return { r: s.r + 1, text: (s.r + 1) + '回' };
+  }
+  if (kind === 'assist') {
+    if (!(s.r > 0)) return null;
+    if (s.r >= REP_CEIL) {                       // 回数が伸びたら補助を減らす
+      const w = Math.max(0, Math.round((s.w - WEIGHT_STEP) * 10) / 10);
+      return { w, r: Math.max(6, REP_CEIL - 2), text: '補助' + w + 'kg×' + Math.max(6, REP_CEIL - 2) };
+    }
+    return { w: s.w, r: s.r + 1, text: '補助' + s.w + 'kg×' + (s.r + 1) };
   }
   if (!(s.w > 0 && s.r > 0)) return null;
   if (s.r >= REP_CEIL) {
@@ -1179,7 +1222,7 @@ function renderLog() {
         ? '前回 ' + mdLabel(prev.date) + '：' + prev.sets.map(s => setLabel(s, kind)).join(' / ')
         : '前回の記録なし';
       const deltaTag = pr.delta
-        ? '<span class="delta ' + (pr.delta[0] === '+' ? 'up' : 'down') + '">前回比 ' + esc(pr.delta) + '</span>'
+        ? '<span class="delta ' + (pr.deltaGood ? 'up' : 'down') + '">前回比 ' + esc(pr.delta) + '</span>'
         : '';
       const goal = nextGoal(en.exId, curDate);
       const goalTag = goal
@@ -1198,7 +1241,7 @@ function renderLog() {
         const body = cardio
           ? fld('in-t', s.t, ph && num(ph.t) ? num(ph.t) : '分', false) +
             fld('in-d', s.d, ph && num(ph.d) ? num(ph.d) : 'km', true)
-          : (bw ? '' : fld('in-w', s.w, ph ? num(ph.w) : 'kg', true)) +
+          : (bw ? '' : fld('in-w', s.w, ph ? num(ph.w) : (kind === 'assist' ? '補助' : 'kg'), true)) +
             fld('in-r', s.r, ph ? num(ph.r) : '回', false);
         return '<div class="set-row' + (bw ? ' bw' : '') + (filled(s) ? ' is-done' : '') + '" data-e="' + ei + '" data-s="' + si + '">' +
           '<div class="n">' + (si + 1) + '</div>' + body +
@@ -1211,7 +1254,7 @@ function renderLog() {
         '<div class="ex-head">' +
           (pr.isPr ? '<span class="pr-badge" title="自己ベスト更新">🏆</span>' : '') +
           '<div class="name" data-act="tips" data-e="' + ei + '" title="ポイントと自分用メモ">' +
-            esc(ex.name) + '<span class="nametip">?</span></div>' +
+            esc(ex.name) + '</div>' +
           (ex.cat ? '<div class="cat">' + esc(ex.cat) + '</div>' : '') +
           '<button class="btn sm ghost" data-act="tips" data-e="' + ei + '" title="ポイントを見る">?</button>' +
           '<button class="btn sm ghost" data-act="chart" data-e="' + ei + '" title="推移を見る">📈</button>' +
@@ -1221,7 +1264,7 @@ function renderLog() {
         (goalTag ? '<div class="goal-line">' + goalTag + '</div>' : '') +
         (ex.note ? '<div class="exnote" data-act="tips" data-e="' + ei + '">' + esc(ex.note) + '</div>' : '') +
         '<div class="sets">' +
-          '<div class="set-head' + (bw ? ' bw' : '') + '"><div></div>' + (cardio ? '<div>時間(分)</div><div>距離(km)</div>' : (bw ? '' : '<div>重量(kg)</div>') + '<div>回数</div>') + '<div>追加</div><div></div></div>' +
+          '<div class="set-head' + (bw ? ' bw' : '') + '"><div></div>' + (cardio ? '<div>時間(分)</div><div>距離(km)</div>' : (bw ? '' : (kind === 'assist' ? '<div>補助(kg)</div>' : '<div>重量(kg)</div>')) + '<div>回数</div>') + '<div>追加</div><div></div></div>' +
           rows +
         '</div>' +
         '<div class="ex-foot">' +
@@ -1902,7 +1945,11 @@ function renderStats() {
     wpts.push({ label: mdLabel(key), v: byWeek.get(key) || 0 });
   }
   const volBox = $('#volChart');
-  volBox.innerHTML = ss.length ? barChart(wpts, volBox) : '<div class="empty">データがありません。</div>';
+  // 自重・有酸素・補助だけの期間はボリュームが全て0になる。空の軸を描いても読めない
+  volBox.innerHTML = !ss.length ? '<div class="empty">データがありません。</div>'
+    : wpts.every(x => x.v === 0)
+      ? '<div class="empty">この8週間は挙上量を伴う記録がありません。<br>自重・有酸素・補助の種目は挙上量に含みません。</div>'
+      : barChart(wpts, volBox);
 
   // 種目セレクト（記録のある種目のみ）
   const used = [];
@@ -1951,6 +1998,10 @@ function exPoints(exId, mt) {
       v = mt === 'top' ? sum(done, x => num(x.d)) : sum(done, x => num(x.t));
     } else if (kind === 'bw') {
       v = mt === 'vol' ? sum(done, x => num(x.r)) : Math.max.apply(null, done.map(x => num(x.r)));
+    } else if (kind === 'assist') {
+      // 補助重量は最小、回数は最大がその日の成績
+      v = mt === 'top' ? Math.min.apply(null, done.map(x => num(x.w)))
+        : Math.max.apply(null, done.map(x => num(x.r)));
     } else {
       v = mt === 'vol' ? sum(done, setVol)
         : mt === 'top' ? Math.max.apply(null, done.map(x => num(x.w)))
@@ -1960,25 +2011,33 @@ function exPoints(exId, mt) {
     pts.push({ label: mdLabel(s.date), date: s.date, v,
       maxReps: Math.max.apply(null, done.map(x => num(x.r)).concat([0])) });
   }
-  pts.unit = kind === 'cardio' ? (mt === 'top' ? 'km' : '分') : kind === 'bw' ? '回' : 'kg';
+  pts.unit = kind === 'cardio' ? (mt === 'top' ? 'km' : '分')
+    : kind === 'bw' ? '回'
+    : kind === 'assist' ? (mt === 'top' ? 'kg' : '回')
+    : 'kg';
   return pts;
 }
 function bestLine(pts, mt, exId) {
   if (!pts.length) return '';
   const kind = kindOf(exId);
-  const max = Math.max.apply(null, pts.map(p => p.v));
+  const vals = pts.map(p => p.v);
+  // 補助重量だけは小さいほど良い成績なので最小を出す
+  const max = (kind === 'assist' && mt === 'top') ? Math.min.apply(null, vals) : Math.max.apply(null, vals);
   const name = kind === 'cardio' ? (mt === 'top' ? '最長距離' : '最長時間')
     : kind === 'bw' ? (mt === 'vol' ? '最高 合計回数' : '最高 連続回数')
+    : kind === 'assist' ? (mt === 'top' ? '最小 補助重量' : '最高 連続回数')
     : (mt === 'vol' ? '最高ボリューム' : mt === 'top' ? '最大重量' : '推定1RM 最高');
   const isE1 = kind === 'weight' && mt === 'e1rm';
   const over = isE1 && pts.some(p => p.maxReps > 10);
   return name + '：' + (Math.round(max * 10) / 10) + ' ' + (pts.unit || 'kg') +
-    (isE1 ? (over ? '（⚠ 11回以上のセットを含むため過大評価の可能性）' : '（Epley式）') : '');
+    (isE1 ? (over ? '（⚠ 11回以上のセットを含むため過大評価の可能性）' : '（Epley式）') : '') +
+    (kind === 'assist' && mt === 'top' ? '（下がるほど進歩）' : '');
 }
 // 自重種目では重量ベースの指標が無いので、チップの表示も差し替える
 function labelMetrics(scope, kind) {
   const labels = kind === 'cardio' ? { e1rm: '時間', top: '距離', vol: '' }
     : kind === 'bw' ? { e1rm: '最高回数', top: '', vol: '合計回数' }
+    : kind === 'assist' ? { e1rm: '回数', top: '補助重量', vol: '' }
     : { e1rm: '推定1RM', top: '最大重量', vol: 'ボリューム' };
   $$(scope).forEach(c => {
     const k = c.dataset.metric || c.dataset.cmetric;
@@ -2031,7 +2090,7 @@ function renderChartSheet() {
       esc(done.map(x => setLabel(x, kindOf(chExId))).join(' / ')) + '</span></div>' +
       '<div style="font-size:12px;color:var(--muted);white-space:nowrap">' +
       (isCardio(chExId) ? fmt(done.reduce((a, x) => a + num(x.t), 0)) + ' 分'
-       : isBw(chExId) ? fmt(done.reduce((a, x) => a + num(x.r), 0)) + ' 回'
+       : (isBw(chExId) || isAssist(chExId)) ? fmt(done.reduce((a, x) => a + num(x.r), 0)) + ' 回'
        : fmt(done.reduce((a, x) => a + setVol(x), 0)) + ' kg') + '</div></div>');
     if (rows.length >= 30) break;
   }
@@ -2344,11 +2403,11 @@ $('#v-ex').addEventListener('click', e => {
   const kb = e.target.closest('[data-kind]');
   if (kb) {
     const ex = exById(kb.dataset.kind);
-    const order = ['weight', 'bw', 'cardio'];
+    const order = ['weight', 'bw', 'cardio', 'assist'];
     ex.kind = order[(order.indexOf(ex.kind) + 1) % order.length];
     ex.u = nowISO();
     save(); renderExMaster();
-    const how = { weight: '重量×回数', bw: '回数のみ', cardio: '時間・距離' };
+    const how = { weight: '重量×回数', bw: '回数のみ', cardio: '時間・距離', assist: '補助重量×回数' };
     toast(ex.name + '：' + how[ex.kind] + ' で記録します');
     return;
   }
@@ -2618,6 +2677,11 @@ const TIPS = {
   'チェストプレス': ['軌道が固定されるのでフォームが安定しやすい。初心者向き',
     'シート高はグリップが胸の高さに来る位置に合わせる',
     '押し切ったところで肘を完全にロックしない'],
+  'アシストディップス': ['補助重量が大きいほど楽になる。まず8〜10回できる補助から始め、回数が伸びたら補助を減らす',
+    '上体を前に倒すと胸、立てると三頭筋に効きやすい',
+    '肩がすくまないよう、肩を下げた位置を保つ',
+    '深く下ろしすぎると肩の前側を痛めやすい。上腕が床と平行になるあたりまでを目安に',
+    '肘を外へ大きく開かない。体側に沿わせる'],
   'ダンベルフライ': ['肘は軽く曲げた角度で固定したまま、弧を描いて下ろす',
     '肩の前に負担が集中しやすい。可動域は浅めから試す',
     '重量を追わず、胸が伸びる感覚を優先する'],
@@ -2626,6 +2690,11 @@ const TIPS = {
     'きつければ膝をつく、余裕があれば足を台に乗せて負荷を上げる'],
 
   // --- 背中 ---
+  'アシストチンニング': ['補助重量が大きいほど楽になる。まず8〜10回できる補助から始め、回数が伸びたら補助を減らす',
+    '肩をすくめず、肩甲骨を下げてから引き始める',
+    'あごを乗せにいくより、胸を張ってバーへ鎖骨を運ぶ意識',
+    '下ろす動作も力を抜かず、腕が伸びきるまで丁寧に戻す',
+    'パッドの上で反動を使うと補助が効きすぎる。静かに動かす'],
   'デッドリフト': ['背中を丸めない。これが最優先。丸まるなら重量を落とす',
     'バーは体に沿わせて上げる。体から離れるほど腰の負担が増える',
     '膝ではなく股関節から動かす意識。お尻で持ち上げる',
