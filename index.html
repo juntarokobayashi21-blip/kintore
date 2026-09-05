@@ -378,10 +378,14 @@
     padding:9px 18px; font-size:calc(13px * var(--fs)); opacity:0; pointer-events:none; transition:opacity .2s;
   }
   .toast.show{opacity:1}
-  /* 取り消しボタンを載せるときだけタップを受け付ける */
-  .toast.act{pointer-events:auto; padding:7px 7px 7px 18px}
+  /* 取り消し付きは下のボタン列と重なるので、その分だけ上に出す */
+  .toast.act{padding:7px 7px 7px 18px; bottom:152px}
   .toast .undo{background:var(--accent); color:var(--on-accent); border:0; border-radius:999px;
     padding:6px 14px; margin-left:12px; font-size:calc(13px * var(--fs)); font-weight:700}
+  /* タップを受けるのは表示中の「取り消し」ボタンだけ。
+     ピル全体を pointer-events:auto にすると、消えた後も透明な板が残って
+     下のボタンを押せなくなる */
+  .toast.show.act .undo{pointer-events:auto}
 </style>
 </head>
 <body>
