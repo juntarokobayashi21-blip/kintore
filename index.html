@@ -100,6 +100,11 @@
   .card h2{font-size:calc(13px * var(--fs)); margin:0 0 8px; color:var(--muted); font-weight:600; letter-spacing:.04em}
 
   .row{display:flex; align-items:center; gap:8px}
+  /* 幅が足りないときは折り返す。潰れて1文字ずつ改行されるのを防ぐ */
+  .row.wrap{flex-wrap:wrap; row-gap:8px}
+  /* 日付の前後送り。狭い画面でも日付欄を圧迫しない幅に固定する */
+  .daynav{flex:0 0 auto; padding:9px 0; width:32px; text-align:center; background:transparent;
+    font-size:calc(15px * var(--fs)); color:var(--muted); border-radius:9px}
   .btn{
     background:var(--panel2); border:1px solid var(--line); color:var(--fg);
     border-radius:11px; padding:10px 14px; font-size:calc(14px * var(--fs)); font-weight:600;
@@ -139,6 +144,13 @@
     border-bottom:1px solid var(--line); background:linear-gradient(180deg,var(--exh1),var(--exh2))}
   .ex-head .name{font-weight:700; font-size:calc(15px * var(--fs)); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
   .ex-head .cat{font-size:calc(11px * var(--fs)); color:var(--muted); background:var(--bg); border-radius:999px; padding:2px 8px; white-space:nowrap}
+  /* 種目ヘッダのアイコンボタン。数が多いので幅を詰めつつ高さで押しやすさを確保 */
+  .ex-head .ib{flex:0 0 auto; padding:8px 7px; font-size:calc(13px * var(--fs)); border-radius:9px;
+    background:transparent; border:1px solid var(--line); color:var(--muted); line-height:1}
+  .ex-head .ib:disabled{opacity:.3}
+  .ex-head .ib:active{filter:brightness(1.3)}
+  /* 同じ種目を1日に2回以上やったとき、2つ目以降に付ける印 */
+  .ex-head .rep{font-size:calc(10px * var(--fs)); color:var(--accent2); white-space:nowrap}
   .prev-line{font-size:calc(12px * var(--fs)); color:var(--muted); padding:8px 14px 0}
   .delta{display:inline-block; margin-left:8px; padding:1px 7px; border-radius:999px;
     font-size:calc(11px * var(--fs)); font-weight:700; font-variant-numeric:tabular-nums}
@@ -161,8 +173,8 @@
   }
   .goal:active{background:var(--accent); color:var(--on-accent); border-style:solid}
   .sets{padding:8px 10px 12px}
-  .set-row{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; align-items:center; margin-bottom:6px}
-  .set-row.bw, .set-head.bw{grid-template-columns:22px 1fr 38px 28px}
+  .set-row{display:grid; grid-template-columns:22px 1fr 1fr 40px 36px; gap:6px; align-items:center; margin-bottom:6px}
+  .set-row.bw, .set-head.bw{grid-template-columns:22px 1fr 40px 36px}
   .set-row .n{text-align:center; font-size:calc(13px * var(--fs)); color:var(--muted); font-variant-numeric:tabular-nums}
   .set-row input{padding:12px 8px; text-align:center; font-size:calc(16px * var(--fs)); font-variant-numeric:tabular-nums}
   .set-row input::placeholder{color:color-mix(in srgb, var(--muted) 65%, transparent)}
@@ -171,8 +183,10 @@
   .set-row.is-done .n{color:var(--accent2); font-weight:700}
   .set-row .cp{background:var(--panel2); border:1px solid var(--line); border-radius:9px; padding:12px 0; font-size:calc(14px * var(--fs)); color:var(--muted); line-height:1}
   .set-row .cp:active{background:var(--accent); color:var(--on-accent)}
-  .set-row .del{background:none; border:0; color:var(--muted); font-size:calc(18px * var(--fs)); padding:0}
-  .set-head{display:grid; grid-template-columns:22px 1fr 1fr 38px 28px; gap:6px; font-size:calc(11px * var(--fs)); color:var(--muted); padding:0 0 4px; text-align:center}
+  /* 隣の ↪ と押し間違えないよう、指1本分の幅と高さを確保する */
+  .set-row .del{background:none; border:0; color:var(--muted); font-size:calc(18px * var(--fs));
+    padding:0; height:44px; width:100%}
+  .set-head{display:grid; grid-template-columns:22px 1fr 1fr 40px 36px; gap:6px; font-size:calc(11px * var(--fs)); color:var(--muted); padding:0 0 4px; text-align:center}
   .ex-foot{display:flex; gap:8px; padding:0 10px 12px}
 
   .empty{text-align:center; color:var(--muted); padding:24px 10px; font-size:calc(13px * var(--fs))}
@@ -316,11 +330,15 @@
   .modal .sheet h3{margin:0 0 12px; font-size:calc(16px * var(--fs)); font-weight:700}
   .chips{display:flex; gap:6px; flex-wrap:wrap; margin:10px 0}
   .chip{background:var(--panel2); border:1px solid var(--line); border-radius:999px;
-    padding:6px 13px; font-size:calc(13px * var(--fs)); box-shadow:var(--inset); transition:transform .08s}
+    padding:6px 13px; font-size:calc(13px * var(--fs)); box-shadow:var(--inset); transition:transform .08s;
+    flex:0 0 auto; white-space:nowrap}
   .chip:active{transform:scale(.95)}
   .chip.on{background:var(--accent); border-color:var(--accent); color:var(--on-accent); font-weight:700}
   .pick{display:flex; align-items:center; gap:10px; padding:13px 4px; border-bottom:1px solid var(--line); font-size:calc(15px * var(--fs))}
   .pick .cat{font-size:calc(11px * var(--fs)); color:var(--muted)}
+  .pick-h{font-size:calc(11px * var(--fs)); color:var(--muted); letter-spacing:.06em;
+    padding:12px 4px 4px; font-weight:700}
+  .pick-h:first-child{padding-top:2px}
   .pick.sel{color:var(--accent2); font-weight:600}
   /* 種目のポイントを開くボタン */
   .tipbtn{
@@ -360,6 +378,10 @@
     padding:9px 18px; font-size:calc(13px * var(--fs)); opacity:0; pointer-events:none; transition:opacity .2s;
   }
   .toast.show{opacity:1}
+  /* 取り消しボタンを載せるときだけタップを受け付ける */
+  .toast.act{pointer-events:auto; padding:7px 7px 7px 18px}
+  .toast .undo{background:var(--accent); color:var(--on-accent); border:0; border-radius:999px;
+    padding:6px 14px; margin-left:12px; font-size:calc(13px * var(--fs)); font-weight:700}
 </style>
 </head>
 <body>
@@ -427,12 +449,13 @@
   <!-- ========== 記録（ホームから遷移するサブページ） ========== -->
   <section class="view" id="v-log">
     <div class="card" style="padding:10px">
-      <div class="row">
-        <input type="date" id="logDate" style="flex:1.2">
-        <select id="routinePick" style="flex:1"><option value="">ルーティン…</option></select>
+      <div class="row" style="gap:6px">
+        <button class="btn daynav" id="dPrev" title="前の日">‹</button>
+        <input type="date" id="logDate" style="flex:1.5;min-width:0;padding-left:8px;padding-right:6px">
+        <button class="btn daynav" id="dNext" title="次の日">›</button>
+        <select id="routinePick" style="flex:1;min-width:0;padding-left:8px"><option value="">ルーティン</option></select>
       </div>
-      <div class="row" style="margin-top:8px">
-        <span style="font-size:11px;color:var(--muted)">入力</span>
+      <div class="row wrap" style="margin-top:8px">
         <button class="chip" data-mode="key">キーボード</button>
         <button class="chip" data-mode="wheel">ホイール</button>
         <div class="spacer" style="flex:1"></div>
@@ -938,10 +961,13 @@ function normalize(d) {
   }
   // ルーティンの重複参照を落とす（統合で同じ種目が並ぶことがある）
   for (const r of d.routines) r.exIds = (r.exIds || []).filter((id, i, a) => a.indexOf(id) === i);
-  // 同じ日に新旧の名前で記録していた場合は、セットをまとめて1つの種目にする
+  // 同じ日に新旧の名前で記録していた場合だけ、セットをまとめて1つのブロックにする
+  // （同じ種目をあえて2回に分けて記録することもあるので、改名先だけを対象にする）
+  const merged = Object.values(RENAMES);
   for (const ss of d.sessions) {
     const seen = {};
     ss.entries = (ss.entries || []).filter(en => {
+      if (!merged.includes(en.exId)) return true;
       const hit = seen[en.exId];
       if (hit) { hit.sets = (hit.sets || []).concat(en.sets || []); return false; }
       seen[en.exId] = en;
@@ -1086,12 +1112,18 @@ function daySummaryOf(en, kind) {
   return { w: num(top.w), r: num(top.r), e: e1rm(num(top.w), num(top.r)) };
 }
 // その種目を実施した日の要約を古い順に返す
+// 同じ種目を1日に2回やった場合はブロックが複数になるので、まとめて1日分として扱う
+function daySets(sess, exId) {
+  const sets = [];
+  for (const en of sess.entries) if (en.exId === exId) sets.push.apply(sets, en.sets);
+  return sets;
+}
 function exDays(exId) {
   const kind = kindOf(exId);
   const out = [];
   for (const s of db.sessions.slice().sort((a, b) => a.date < b.date ? -1 : 1)) {
-    const en = s.entries.find(e => e.exId === exId); if (!en) continue;
-    const sum = daySummaryOf(en, kind);
+    const sets = daySets(s, exId); if (!sets.length) continue;
+    const sum = daySummaryOf({ sets }, kind);
     if (sum) out.push({ date: s.date, sum });
   }
   return out;
@@ -1186,11 +1218,8 @@ function prevSets(exId, beforeDate) {
     .filter(s => s.date < beforeDate)
     .sort((a, b) => a.date < b.date ? 1 : -1);
   for (const s of cands) {
-    const en = s.entries.find(e => e.exId === exId);
-    if (en) {
-      const done = en.sets.filter(filled);
-      if (done.length) return { date: s.date, sets: done };
-    }
+    const done = daySets(s, exId).filter(filled);
+    if (done.length) return { date: s.date, sets: done };
   }
   return null;
 }
@@ -1203,24 +1232,78 @@ const $$ = s => Array.from(document.querySelectorAll(s));
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 let toastTimer;
-function toast(msg) {
+// undo を渡すと「取り消し」ボタン付きになり、表示時間も長くなる
+function toast(msg, undo) {
   const t = $('#toast');
-  t.textContent = msg; t.classList.add('show');
+  t.textContent = msg;
+  t.classList.toggle('act', !!undo);
+  if (undo) {
+    const b = document.createElement('button');
+    b.className = 'undo'; b.textContent = '取り消し';
+    b.addEventListener('click', () => { hideToast(); undo(); });
+    t.appendChild(b);
+  }
+  t.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+  toastTimer = setTimeout(hideToast, undo ? 5000 : 1800);
 }
-const openModal = id => $(id).classList.add('open');
-const closeModal = id => $(id).classList.remove('open');
+function hideToast() {
+  clearTimeout(toastTimer);
+  $('#toast').classList.remove('show');
+}
+
+/* ---- 戻る操作 ----
+   スマホ（特に Android）の戻るボタンでシートや記録ページを閉じられるように、
+   開くたびに履歴を1段積む。閉じる操作では積んだぶんを戻す。 */
+const navStack = [];
+let navPopping = false;   // popstate 起点の処理中は履歴を触らない
+function navPush(entry) {
+  navStack.push(entry);
+  history.pushState({ n: navStack.length }, '');
+}
+// UI 側から閉じたとき。積んだ履歴も1つ戻しておく
+function navDrop(entry) {
+  const i = navStack.findIndex(x => x.type === entry.type && x.id === entry.id);
+  if (i < 0) return;
+  const top = i === navStack.length - 1;
+  navStack.splice(i, 1);
+  if (top && !navPopping) { navPopping = true; history.back(); }
+}
+window.addEventListener('popstate', () => {
+  if (navPopping) { navPopping = false; return; }   // navDrop から呼んだ back
+  const e = navStack.pop();
+  if (!e) return;
+  navPopping = true;
+  if (e.type === 'modal') $(e.id).classList.remove('open');
+  else if (e.type === 'view') showView('home');
+  navPopping = false;
+});
+
+const openModal = id => { $(id).classList.add('open'); navPush({ type: 'modal', id }); };
+const closeModal = id => {
+  if (!$(id).classList.contains('open')) return;
+  $(id).classList.remove('open');
+  navDrop({ type: 'modal', id });
+};
 document.addEventListener('click', e => {
   if (e.target.hasAttribute && e.target.hasAttribute('data-close')) {
-    e.target.closest('.modal').classList.remove('open');
+    closeModal('#' + e.target.closest('.modal').id);
   }
+});
+// PC ではエスケープでも閉じる
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const top = navStack[navStack.length - 1];
+  if (top && top.type === 'modal') closeModal(top.id);
 });
 
 const TITLES = { home: '筋トレ記録', log: '記録', hist: '履歴', stats: '分析', ex: '種目・ルーティン' };
 let curView = 'home';
 
 function showView(v) {
+  // 記録ページは戻る操作の対象。開いたら履歴を1段積み、離れたら戻す
+  if (v === 'log' && curView !== 'log') navPush({ type: 'view' });
+  else if (v !== 'log' && curView === 'log') navDrop({ type: 'view' });
   curView = v;
   $$('.view').forEach(s => s.classList.toggle('active', s.id === 'v-' + v));
   // 記録はホームから開くサブページなので、タブの選択状態はホームのまま
@@ -1269,7 +1352,7 @@ function renderLog() {
       const bw = kind === 'bw';                 // 自重は回数のみ、有酸素は時間と距離
       const cardio = kind === 'cardio';
       const fld = (cls, val, ph, dec) =>
-        '<input type="number" inputmode="' + (dec ? 'decimal' : 'numeric') + '" step="' + (dec ? '0.1' : '1') +
+        '<input type="number" enterkeyhint="next" inputmode="' + (dec ? 'decimal' : 'numeric') + '" step="' + (dec ? '0.1' : '1') +
         '" class="' + cls + '"' + ro + ' value="' + (val === '' || val == null ? '' : val) + '" placeholder="' + ph + '">';
 
       const rows = en.sets.map((s, si) => {
@@ -1286,15 +1369,23 @@ function renderLog() {
         '</div>';
       }).join('');
 
-      return '<div class="ex-block">' +
+      // 同じ種目が上にもあれば「2回目」と出す
+      const nth = sess.entries.slice(0, ei).filter(x => x.exId === en.exId).length + 1;
+      // 種目名そのものがポイントを開くので、ヘッダには並べ替えと推移だけ置く
+      const move = sess.entries.length > 1
+        ? '<button class="ib" data-act="up" data-e="' + ei + '" title="上へ"' + (ei === 0 ? ' disabled' : '') + '>▲</button>' +
+          '<button class="ib" data-act="down" data-e="' + ei + '" title="下へ"' +
+            (ei === sess.entries.length - 1 ? ' disabled' : '') + '>▼</button>'
+        : '';
+      return '<div class="ex-block" data-block="' + ei + '">' +
         '<div class="ex-head">' +
           (pr.isPr ? '<span class="pr-badge" title="自己ベスト更新">🏆</span>' : '') +
           '<div class="name" data-act="tips" data-e="' + ei + '" title="ポイントと自分用メモ">' +
             esc(ex.name) + '</div>' +
-          (ex.cat ? '<div class="cat">' + esc(ex.cat) + '</div>' : '') +
-          '<button class="btn sm ghost" data-act="tips" data-e="' + ei + '" title="ポイントを見る">?</button>' +
-          '<button class="btn sm ghost" data-act="chart" data-e="' + ei + '" title="推移を見る">📈</button>' +
-          '<button class="btn sm ghost" data-act="delex" data-e="' + ei + '">✕</button>' +
+          (nth > 1 ? '<span class="rep">' + nth + '回目</span>' : '') +
+          move +
+          '<button class="ib" data-act="chart" data-e="' + ei + '" title="推移を見る">📈</button>' +
+          '<button class="ib" data-act="delex" data-e="' + ei + '" title="この日から削除">✕</button>' +
         '</div>' +
         '<div class="prev-line">' + esc(prevTxt) + deltaTag + '</div>' +
         (goalTag ? '<div class="goal-line">' + goalTag + '</div>' : '') +
@@ -1311,6 +1402,22 @@ function renderLog() {
     }).join('');
   }
   renderDaySummary();
+}
+
+// 再描画すると DOM が入れ替わるので、続けて入力できるよう自分で focus を戻す
+function focusSet(ei, si) {
+  if (inputMode === 'wheel') return;              // ホイールでは readonly なので出さない
+  const row = $('#logBody').querySelector('.set-row[data-e="' + ei + '"][data-s="' + si + '"]');
+  if (!row) return;
+  const inp = row.querySelector('input');
+  if (!inp) return;
+  inp.focus();
+  if (inp.select) inp.select();
+}
+// 追加した種目は画面下に付くので、見える位置まで送る
+function focusEntry(ei) {
+  const el = $('#logBody').querySelector('.ex-block[data-block="' + ei + '"]');
+  if (el) el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
 /* ---- カレンダー（記録タブと履歴タブで共用） ---- */
@@ -1563,16 +1670,39 @@ $('#logBody').addEventListener('click', e => {
   }
   if (act === 'delset') {
     const row = btn.closest('.set-row');
-    const en = sess.entries[+row.dataset.e];
-    en.sets.splice(+row.dataset.s, 1);
-    if (!en.sets.length) en.sets.push({ w: '', r: '' });
-    saveDay(); renderLog(); return;
+    const ei = +row.dataset.e, si = +row.dataset.s;
+    const en = sess.entries[ei];
+    const [gone] = en.sets.splice(si, 1);
+    const padded = !en.sets.length;                 // 最後の1つを消したら空欄を1行残す
+    if (padded) en.sets.push({ w: '', r: '' });
+    saveDay(); renderLog();
+    if (!filled(gone)) return;                      // 空のセットは黙って消す
+    toast((si + 1) + 'セット目を削除', () => {
+      const e2 = getSession(curDate, true).entries[ei];
+      if (!e2) return;
+      if (padded) e2.sets.length = 0;
+      e2.sets.splice(si, 0, gone);
+      saveDay(); renderLog();
+    });
+    return;
   }
   if (act === 'addset') {
-    const en = sess.entries[+btn.dataset.e];
+    const ei = +btn.dataset.e;
+    const en = sess.entries[ei];
     const last = en.sets[en.sets.length - 1];
     en.sets.push({ w: last ? last.w : '', r: last ? last.r : '' });
-    saveDay(); renderLog(); return;
+    saveDay(); renderLog();
+    focusSet(ei, en.sets.length - 1);
+    return;
+  }
+  // 種目の並べ替え。実際にやった順に直せるようにする
+  if (act === 'up' || act === 'down') {
+    const i = +btn.dataset.e, j = act === 'up' ? i - 1 : i + 1;
+    if (j < 0 || j >= sess.entries.length) return;
+    const [x] = sess.entries.splice(i, 1);
+    sess.entries.splice(j, 0, x);
+    saveDay(); renderLog(); focusEntry(j);
+    return;
   }
   if (act === 'copyprev') {
     const en = sess.entries[+btn.dataset.e];
@@ -1599,30 +1729,51 @@ $('#logBody').addEventListener('click', e => {
     return;
   }
   if (act === 'tips') { openTips(sess.entries[+btn.dataset.e].exId); return; }
-  if (act === 'tips') {
-    openTips(sess.entries[+btn.dataset.e].exId);
-    return;
-  }
   if (act === 'chart') {
     openExChart(sess.entries[+btn.dataset.e].exId);
     return;
   }
+  // 確認ダイアログを挟まず、取り消せるようにして操作を1タップで済ませる
   if (act === 'delex') {
-    const en = sess.entries[+btn.dataset.e];
-    if (confirm(exName(en.exId) + ' をこの日から削除しますか？')) {
-      sess.entries.splice(+btn.dataset.e, 1);
-      if (!sess.entries.length) dropSession(sess.date);
+    const ei = +btn.dataset.e;
+    const [gone] = sess.entries.splice(ei, 1);
+    if (!sess.entries.length && !sess.memo) dropSession(sess.date);   // メモだけの日は残す
+    saveDay(); renderLog();
+    toast(exName(gone.exId) + ' を削除', () => {
+      getSession(curDate, true).entries.splice(ei, 0, gone);
       saveDay(); renderLog();
-    }
+    });
   }
 });
 
-$('#logDate').addEventListener('change', e => {
-  curDate = e.target.value || today();
+// キーボード入力では Enter で次の欄へ。最後まで行ったらセットを足して続けられる
+$('#logBody').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const inp = e.target.closest('.set-row input'); if (!inp) return;
+  e.preventDefault();
+  const block = inp.closest('.ex-block');
+  const all = Array.from(block.querySelectorAll('.set-row input'));
+  const next = all[all.indexOf(inp) + 1];
+  if (next) { next.focus(); if (next.select) next.select(); return; }
+  const add = block.querySelector('[data-act="addset"]');
+  if (add) add.click();
+});
+
+function setLogDate(ds) {
+  curDate = ds || today();
   calCursor = curDate.slice(0, 7);
   $('#hdr').textContent = dateLabel(curDate) + ' の記録';
   renderLog();
-});
+}
+$('#logDate').addEventListener('change', e => setLogDate(e.target.value));
+// 日付ピッカーを開かずに前後の日へ移れるようにする
+const shiftDate = (ds, n) => {
+  const d = new Date(ds + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  return fmtDate(d);
+};
+$('#dPrev').addEventListener('click', () => setLogDate(shiftDate(curDate, -1)));
+$('#dNext').addEventListener('click', () => setLogDate(shiftDate(curDate, 1)));
 
 /* ---- ホイール入力 ----
    キーボード入力とどちらを使うかは「入力方式」で切り替える。
@@ -1745,6 +1896,20 @@ $('#logBody').addEventListener('click', e => {
 
 /* ---- 種目ピッカー ---- */
 let pickCat = '';
+// 直近90日の実施日数と最終実施日。種目が増えたので、よく使うものを上に出す
+function exUsage() {
+  const since = shiftDate(today(), -90);
+  const u = {};
+  for (const s of db.sessions) {
+    for (const en of s.entries) {
+      if (!en.sets.some(filled)) continue;
+      const h = u[en.exId] || (u[en.exId] = { n: 0, last: '' });
+      if (s.date >= since) h.n++;
+      if (s.date > h.last) h.last = s.date;
+    }
+  }
+  return u;
+}
 function renderPick() {
   const q = $('#pickSearch').value.trim().toLowerCase();
   $('#pickCats').innerHTML = ['すべて'].concat(CATS).map(c => {
@@ -1755,11 +1920,30 @@ function renderPick() {
   const list = db.exercises.filter(e =>
     (!pickCat || e.cat === pickCat) && (!q || e.name.toLowerCase().includes(q))
   );
-  $('#pickList').innerHTML = list.length
-    ? list.map(e => '<div class="pick" data-id="' + esc(e.id) + '"><div style="flex:1">' + esc(e.name) + '</div>' +
-        '<div class="cat">' + esc(e.cat) + '</div>' +
-        '<button class="tipbtn" data-tip="' + esc(e.id) + '" title="ポイントを見る">?</button></div>').join('')
-    : '<div class="empty">該当なし。「種目」タブから追加できます。</div>';
+  const u = exUsage();
+  const rank = (a, b) => {
+    const ua = u[a.id] || { n: 0, last: '' }, ub = u[b.id] || { n: 0, last: '' };
+    if (ub.n !== ua.n) return ub.n - ua.n;
+    return ua.last < ub.last ? 1 : ua.last > ub.last ? -1 : 0;
+  };
+  const row = e => '<div class="pick" data-id="' + esc(e.id) + '"><div style="flex:1">' + esc(e.name) + '</div>' +
+    '<div class="cat">' + esc(e.cat) + '</div>' +
+    '<button class="tipbtn" data-tip="' + esc(e.id) + '" title="ポイントを見る">?</button></div>';
+
+  if (!list.length) {
+    $('#pickList').innerHTML = '<div class="empty">該当なし。「種目」タブから追加できます。</div>';
+    return;
+  }
+  // 検索中は並べ替えだけ。通常はよく使う種目を先頭に分けて出す
+  const often = list.filter(e => u[e.id]).sort(rank).slice(0, 8);
+  if (q || !often.length) {
+    $('#pickList').innerHTML = list.slice().sort(rank).map(row).join('');
+    return;
+  }
+  const rest = list.filter(e => !often.includes(e));
+  $('#pickList').innerHTML =
+    '<div class="pick-h">よく使う</div>' + often.map(row).join('') +
+    (rest.length ? '<div class="pick-h">すべての種目</div>' + rest.map(row).join('') : '');
 }
 $('#btnAddEx').addEventListener('click', () => {
   $('#pickSearch').value = ''; pickCat = '';
@@ -1780,11 +1964,14 @@ $('#pickList').addEventListener('click', e => {
 
 function addExerciseToDay(exId) {
   const sess = getSession(curDate, true);
-  if (sess.entries.some(en => en.exId === exId)) { toast('すでに追加済みです'); return; }
+  // サーキットや2周目のために、同じ種目を1日に何回でも足せる
+  const again = sess.entries.some(en => en.exId === exId);
   const prev = prevSets(exId, curDate);
-  const n = prev ? prev.sets.length : 3;
+  const n = again ? 1 : (prev ? prev.sets.length : 3);
   sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '' })) });
   saveDay(); renderLog();
+  focusEntry(sess.entries.length - 1);
+  if (again) toast(exName(exId) + ' を2回目として追加しました');
 }
 
 /* ---- ルーティン ---- */
@@ -1815,7 +2002,8 @@ let rtEditing = null;
 $('#btnSaveRoutine').addEventListener('click', () => {
   const sess = getSession(curDate, false);
   if (!sess || !sess.entries.length) { toast('先に種目を追加してください'); return; }
-  rtEditing = { id: null, name: '', exIds: sess.entries.map(en => en.exId) };
+  // 同じ種目を2回やった日でも、ルーティンには1つだけ入れる
+  rtEditing = { id: null, name: '', exIds: sess.entries.map(en => en.exId).filter((id, i, a) => a.indexOf(id) === i) };
   openRoutineEditor();
 });
 function openRoutineEditor() {
