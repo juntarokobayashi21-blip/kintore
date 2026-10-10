@@ -222,6 +222,25 @@
   .wbar .t{height:6px; background:var(--line); border-radius:3px; overflow:hidden}
   .wbar .f{height:100%; background:var(--accent2); border-radius:3px}
 
+  /* 年末目標。.goal は「次の目標」ボタンで使っているので別名にする */
+  .yg{padding:9px 0; border-bottom:1px solid var(--line)}
+  .yg:first-child{padding-top:2px}
+  .yg:last-child{border-bottom:0; padding-bottom:2px}
+  .yg-head{display:flex; align-items:baseline; gap:8px; margin-bottom:5px}
+  .yg-name{font-size:calc(14px * var(--fs)); font-weight:600; flex:1; min-width:0}
+  .yg-num{font-size:calc(13px * var(--fs)); font-weight:800; white-space:nowrap;
+    font-variant-numeric:tabular-nums}
+  .yg-t{height:7px; background:var(--line); border-radius:4px; overflow:hidden}
+  .yg-f{height:100%; background:var(--accent); border-radius:4px; min-width:2px}
+  .yg-f.done{background:var(--accent2)}
+  .yg-foot{display:flex; justify-content:space-between; gap:8px; margin-top:4px;
+    font-size:calc(10px * var(--fs)); color:var(--muted); font-variant-numeric:tabular-nums}
+  .yg-sum{display:flex; justify-content:space-between; align-items:baseline; gap:8px;
+    margin-top:9px; padding-top:9px; border-top:1px solid var(--line);
+    font-size:calc(12px * var(--fs)); color:var(--muted)}
+  .yg-sum b{font-size:calc(15px * var(--fs)); font-weight:800; color:var(--fg);
+    font-variant-numeric:tabular-nums}
+
   .cal-head{display:flex; align-items:center; gap:4px; margin-bottom:6px}
   .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:2px; justify-items:center}
   .cal-grid .dow{font-size:calc(9px * var(--fs)); color:var(--muted); text-align:center; padding:1px 0; letter-spacing:.02em}
@@ -558,6 +577,11 @@
         <div class="stat"><b id="kSess">0</b><span>総セッション</span></div>
         <div class="stat"><b id="kStreak">0</b><span>連続週</span></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>年末までの目標 <span id="ygLeft" style="font-weight:400"></span></h2>
+      <div id="ygBox"></div>
     </div>
 
     <div class="card chartcard" style="flex:0.85">
@@ -2188,6 +2212,7 @@ function renderStats() {
     ? used.map(id => '<option value="' + esc(id) + '">' + esc(exName(id)) + '</option>').join('')
     : '<option value="">記録なし</option>';
   if (used.includes(keep)) sel.value = keep;
+  renderYearGoals();
   renderExChart();
 }
 
@@ -3227,6 +3252,69 @@ function renderPr() {
       '<div style="font-weight:800;white-space:nowrap;font-variant-numeric:tabular-nums">' + esc(r.b.main) + '</div>' +
     '</div>';
   }).join('') : '<div class="empty">記録のある種目がありません。</div>';
+}
+
+/* ============================================================
+   年末までのBIG3目標
+   ------------------------------------------------------------
+   現在値は「その重量で10レップ以上こなせた最大重量」。nextGoal の
+   漸進ルール（10回届いたら +2.5kg）と同じ単位なので、種目画面の
+   「🎯 次の目標」を追っていれば自然に進む。
+   base は計画を立てた時点（2026-10-06）の到達重量。
+============================================================ */
+const YG_DEADLINE = '2026-12-31';
+const YEAR_GOALS = [
+  { ex: 'スクワット', base: 85, goal: 92.5, stretch: 95 },
+  { ex: 'デッドリフト', base: 85, goal: 97.5, stretch: 100 },
+  { ex: 'ベンチプレス', base: 30, goal: 40, stretch: 42.5 },
+];
+
+// その種目で目標回数以上こなせた最大重量。履歴の最大なので下がらない
+function tenRepMax(exId) {
+  let best = 0;
+  for (const s of db.sessions) {
+    for (const st of daySets(s, exId)) {
+      if (filled(st) && num(st.r) >= REP_CEIL && num(st.w) > best) best = num(st.w);
+    }
+  }
+  return best;
+}
+
+function renderYearGoals() {
+  const rows = YEAR_GOALS.filter(g => exById(g.ex));
+  const left = Math.round(
+    (new Date(YG_DEADLINE + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 86400000);
+  $('#ygLeft').textContent = rows.length
+    ? (left > 0 ? '／ あと' + left + '日' : '／ 期限終了')
+    : '';
+  if (!rows.length) {
+    $('#ygBox').innerHTML = '<div class="empty">対象の種目が種目マスタにありません。</div>';
+    return;
+  }
+  let sumNow = 0, sumGoal = 0;
+  const html = rows.map(g => {
+    const now = tenRepMax(g.ex);
+    sumNow += now; sumGoal += g.goal;
+    const span = g.goal - g.base;
+    const pct = span > 0 ? Math.max(0, Math.min(100, (now - g.base) / span * 100)) : (now >= g.goal ? 100 : 0);
+    const done = now >= g.goal;
+    const rest = Math.round((g.goal - now) * 10) / 10;
+    return '<div class="yg">' +
+      '<div class="yg-head">' +
+        '<span class="yg-name">' + esc(exName(g.ex)) + '</span>' +
+        '<span class="yg-num">' + (now || '—') + ' → ' + g.goal + ' kg</span>' +
+      '</div>' +
+      '<div class="yg-t"><div class="yg-f' + (done ? ' done' : '') +
+        '" style="width:' + pct.toFixed(1) + '%"></div></div>' +
+      '<div class="yg-foot">' +
+        '<span>' + (done ? '🎉 達成' : 'あと ' + rest + ' kg') + '</span>' +
+        '<span>挑戦 ' + g.stretch + ' kg</span>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+  $('#ygBox').innerHTML = html +
+    '<div class="yg-sum"><span>BIG3 合計</span>' +
+    '<span><b>' + (Math.round(sumNow * 10) / 10) + '</b> → ' + sumGoal + ' kg</span></div>';
 }
 
 /* ============================================================
