@@ -169,6 +169,18 @@
   .delta.down{background:color-mix(in srgb, var(--danger) 18%, transparent); color:var(--danger)}
   .pr-badge{font-size:calc(15px * var(--fs)); line-height:1; flex:0 0 auto}
   .goal-line{padding:6px 14px 0}
+  /* 下げる提案は昇格と見間違えないよう色を変える */
+  .goal.down{background:color-mix(in srgb, var(--danger) 13%, transparent);
+    border-color:var(--danger); color:var(--danger)}
+  .goal-why{font-size:calc(11px * var(--fs)); color:var(--muted); margin-top:4px; line-height:1.5}
+  .today-line{font-size:calc(11px * var(--fs)); color:var(--muted); padding:0 14px 2px;
+    line-height:1.5; font-variant-numeric:tabular-nums}
+  .today-line.ok{color:var(--accent2); font-weight:700}
+  /* 履歴・最近の記録につけるルーティン名。推定は括弧と薄さで区別する */
+  .rt-badge{font-size:calc(10px * var(--fs)); font-weight:700; padding:1px 7px;
+    border-radius:999px; margin-left:6px; vertical-align:1px; white-space:nowrap;
+    background:color-mix(in srgb, var(--accent) 16%, transparent); color:var(--accent)}
+  .rt-badge.guess{background:transparent; border:1px dashed var(--line); color:var(--muted); font-weight:500}
   /* 種目に紐づく自分用メモ。記録中に常に見える位置に出す */
   .exnote{
     margin:8px 12px 0; padding:6px 10px; border-left:2px solid var(--accent);
@@ -1218,37 +1230,72 @@ function prState(exId, date) {
   };
 }
 
-// 前回の内容から次の目標を出す。漸進性過負荷の素朴な規則：
-// 目標回数（10回）に届いていれば回数を1つ増やし、届いたら重量を上げて回数を戻す。
+/* 次の目標。8〜10回の窓にセットを収め続けるための規則：
+   - 全セットが10回に届いた   → 重量を上げて8回から
+   - 最少が8〜9回            → 同じ重量で10回を狙う
+   - 最少が6〜7回            → 同じ重量で「最少+1回」を全セットで
+   - 最少が6回未満           → 重量を下げて8回から
+   いちばんきつい1セットではなく最少のセットで見るのが要点。1セットだけ
+   10回届いた日に重量を上げると、残りが8回に届かないまま重くなっていき、
+   数週間ぶん詰まる（実際にベンチプレスとショルダープレスがそうなった）。 */
 const REP_CEIL = 10, WEIGHT_STEP = 2.5;
+const REP_FLOOR = 8, REP_BAIL = 6;
+const stepW = v => Math.max(0, Math.round(v * 10) / 10);
+
+// その日の主働重量と、その重量でこなした回数。重量ごとに数えてセット数が
+// 最多のものを採る（同数なら重い方）。単発の挑戦セットに引きずられないため。
+function workingSet(sets) {
+  const g = new Map();
+  for (const s of sets) {
+    const w = num(s.w);
+    if (!g.has(w)) g.set(w, []);
+    g.get(w).push(num(s.r));
+  }
+  let best = null;
+  for (const [w, reps] of g) {
+    if (!best || reps.length > best.reps.length ||
+      (reps.length === best.reps.length && w > best.w)) best = { w, reps };
+  }
+  return best;
+}
+
 function nextGoal(exId, date) {
   const kind = kindOf(exId);
-  const past = exDays(exId).filter(x => x.date < date);
-  if (!past.length) return null;
-  const s = past[past.length - 1].sum;
+  const prev = prevSets(exId, date);
+  if (!prev) return null;
+
   if (kind === 'cardio') {
-    if (s.d > 0) return { d: Math.round((s.d + 0.5) * 10) / 10, t: s.t || '', text: (Math.round((s.d + 0.5) * 10) / 10) + 'km' };
-    if (s.t > 0) return { t: s.t + 5, d: '', text: (s.t + 5) + '分' };
+    const top = prev.sets.reduce((a, b) =>
+      num(b.d) * 1000 + num(b.t) > num(a.d) * 1000 + num(a.t) ? b : a, prev.sets[0]);
+    const d = num(top.d), t = num(top.t);
+    if (d > 0) return { d: stepW(d + 0.5), t: t || '', text: stepW(d + 0.5) + 'km', why: '前回 ' + d + 'km' };
+    if (t > 0) return { t: t + 5, d: '', text: (t + 5) + '分', why: '前回 ' + t + '分' };
     return null;
   }
   if (kind === 'bw') {
-    if (!(s.r > 0)) return null;
-    return { r: s.r + 1, text: (s.r + 1) + '回' };
+    const r = Math.max.apply(null, prev.sets.map(s => num(s.r)));
+    if (!(r > 0)) return null;
+    return { r: r + 1, text: (r + 1) + '回', why: '前回 最高' + r + '回' };
   }
-  if (kind === 'assist') {
-    if (!(s.r > 0)) return null;
-    if (s.r >= REP_CEIL) {                       // 回数が伸びたら補助を減らす
-      const w = Math.max(0, Math.round((s.w - WEIGHT_STEP) * 10) / 10);
-      return { w, r: Math.max(6, REP_CEIL - 2), text: '補助' + w + 'kg×' + Math.max(6, REP_CEIL - 2) };
-    }
-    return { w: s.w, r: s.r + 1, text: '補助' + s.w + 'kg×' + (s.r + 1) };
-  }
-  if (!(s.w > 0 && s.r > 0)) return null;
-  if (s.r >= REP_CEIL) {
-    const w = Math.round((s.w + WEIGHT_STEP) * 10) / 10;
-    return { w, r: Math.max(6, REP_CEIL - 2), text: w + 'kg×' + Math.max(6, REP_CEIL - 2) };
-  }
-  return { w: s.w, r: s.r + 1, text: s.w + 'kg×' + (s.r + 1) };
+
+  const ws = workingSet(prev.sets);
+  if (!ws || !(ws.w > 0) || !ws.reps.some(r => r > 0)) return null;
+  const lo = Math.min.apply(null, ws.reps);
+  if (!(lo > 0)) return null;
+
+  const asst = kind === 'assist';
+  const label = w => (asst ? '補助' + w : w + 'kg');
+  const basis = '前回 ' + label(ws.w) + ' ' + ws.reps.join('/') + '回';
+  // 補助重量は増やすほど楽になるので、上げ下げの向きが他と逆になる
+  const harder = stepW(ws.w + (asst ? -WEIGHT_STEP : WEIGHT_STEP));
+  const easier = stepW(ws.w + (asst ? WEIGHT_STEP : -WEIGHT_STEP));
+  const mk = (w, r, why, down) => ({ w, r, text: label(w) + '×' + r, why: basis + ' — ' + why, down });
+
+  if (lo >= REP_CEIL) return mk(harder, REP_FLOOR, '全セット' + REP_CEIL + '回達成');
+  if (lo >= REP_FLOOR) return mk(ws.w, REP_CEIL, 'あと' + (REP_CEIL - lo) + '回で重量アップ');
+  if (lo >= REP_BAIL) return mk(ws.w, lo + 1, '最少' + lo + '回。まず全セットで' + (lo + 1) + '回');
+  return mk(easier, REP_FLOOR, '最少' + lo + '回。' + REP_FLOOR + '〜' + REP_CEIL +
+    '回できる重量まで下げる', true);
 }
 
 // その日より前で、その種目を最後にやったセッションの記録済みセット
@@ -1363,6 +1410,31 @@ $('#btnBack').addEventListener('click', () => showView('home'));
 /* ============================================================
    記録ビュー
 ============================================================ */
+// その日の達成状況を1行で出す。重量を上げていいかを記録中に判断できるように。
+function todayLine(en, kind) {
+  if (kind === 'cardio' || kind === 'bw') return '';
+  const done = en.sets.filter(filled);
+  if (!done.length) return '';
+  const ws = workingSet(done);
+  if (!ws || !(ws.w > 0)) return '';
+  const lo = Math.min.apply(null, ws.reps);
+  const asst = kind === 'assist';
+  const head = (asst ? '補助' + ws.w : ws.w + 'kg') + ' ' + ws.reps.join('/') + '回';
+  const remain = en.sets.length - done.length;      // まだ空のセット
+  if (lo >= REP_CEIL && !remain) {
+    const nx = stepW(ws.w + (asst ? -WEIGHT_STEP : WEIGHT_STEP));
+    return '<div class="today-line ok">✓ 全セット' + REP_CEIL + '回 — 次回 ' +
+      (asst ? '補助' + nx : nx + 'kg') + ' へ</div>';
+  }
+  // 空のセットが残っているうちは達成を名乗らない
+  if (remain > 0) {
+    return '<div class="today-line">' + esc(head) + ' — 残り' + remain + 'セット</div>';
+  }
+  const rest = ws.reps.filter(r => r < REP_CEIL).length;
+  return '<div class="today-line">' + esc(head) + ' — 最少' + lo + '回。あと' +
+    rest + 'セットが' + REP_CEIL + '回で重量アップ</div>';
+}
+
 function renderLog() {
   $('#logDate').value = curDate;
   const sess = getSession(curDate, false);
@@ -1384,7 +1456,9 @@ function renderLog() {
         : '';
       const goal = nextGoal(en.exId, curDate);
       const goalTag = goal
-        ? '<button class="goal" data-act="goal" data-e="' + ei + '">🎯 次の目標 ' + esc(goal.text) + '</button>'
+        ? '<button class="goal' + (goal.down ? ' down' : '') + '" data-act="goal" data-e="' + ei + '">' +
+            (goal.down ? '↓ 重量を下げる ' : '🎯 次の目標 ') + esc(goal.text) + '</button>' +
+          (goal.why ? '<div class="goal-why">' + esc(goal.why) + '</div>' : '')
         : '';
 
       const ro = inputMode === 'wheel' ? ' readonly' : '';
@@ -1433,6 +1507,7 @@ function renderLog() {
           '<div class="set-head' + (bw ? ' bw' : '') + '"><div></div>' + (cardio ? '<div>時間(分)</div><div>距離(km)</div>' : (bw ? '' : (kind === 'assist' ? '<div>補助(kg)</div>' : '<div>重量(kg)</div>')) + '<div>回数</div>') + '<div>追加</div><div></div></div>' +
           rows +
         '</div>' +
+        todayLine(en, kind) +
         '<div class="ex-foot">' +
           '<button class="btn sm" data-act="addset" data-e="' + ei + '" style="flex:1">＋ セット</button>' +
           (prev ? '<button class="btn sm" data-act="copyprev" data-e="' + ei + '" style="flex:1">前回をコピー</button>' : '') +
@@ -1655,7 +1730,7 @@ function renderRecent() {
     const cs = Array.from(sessionCats(s))
       .map(c => '<span style="color:' + (CAT_COLOR[c] || '#94a3b8') + '">' + esc(c) + '</span>').join(' ');
     return '<div class="list-item" data-recent="' + s.date + '">' +
-      '<div class="t"><b>' + dateLabel(s.date) + (s.memo ? ' 📝' : '') + '</b>' +
+      '<div class="t"><b>' + dateLabel(s.date) + (s.memo ? ' 📝' : '') + routineBadge(s) + '</b>' +
       '<span>' + cs + ' ／ ' + loggedSets(s) + 'セット</span></div>' +
       '<div style="font-size:calc(12px * var(--fs));color:var(--muted);white-space:nowrap">' +
       fmt(sessionVolume(s)) + ' kg</div></div>';
@@ -2014,6 +2089,32 @@ function addExerciseToDay(exId) {
 }
 
 /* ---- ルーティン ---- */
+// その日がどのルーティンだったか。選んで記録した日は名前が残っているが、
+// 残っていない過去の日は種目の重なりから推定する（推定は見た目で区別する）。
+function routineLabel(sess) {
+  if (!sess) return null;
+  if (sess.routine && db.routines.some(r => r.id === sess.routine)) {
+    return { name: sess.routine, guess: false };
+  }
+  const ids = Array.from(new Set(
+    sess.entries.filter(en => en.sets.some(filled)).map(en => en.exId)));
+  if (!ids.length || !db.routines.length) return null;
+  let best = null, second = 0;
+  for (const r of db.routines) {
+    const set = new Set(r.exIds);
+    const hit = ids.filter(id => set.has(id)).length / ids.length;
+    if (!best || hit > best.hit) { second = best ? best.hit : 0; best = { name: r.name, hit }; }
+    else if (hit > second) second = hit;
+  }
+  if (!best || best.hit < 0.3 || best.hit <= second) return null;
+  return { name: best.name, guess: true };
+}
+const routineBadge = sess => {
+  const l = routineLabel(sess);
+  return l ? '<span class="rt-badge' + (l.guess ? ' guess' : '') + '">' +
+    esc(l.guess ? '（' + l.name + '）' : l.name) + '</span>' : '';
+};
+
 function renderRoutinePick() {
   $('#routinePick').innerHTML = '<option value="">ルーティン…</option>' +
     db.routines.map(r => '<option value="' + esc(r.id) + '">' + esc(r.name) + '</option>').join('');
@@ -2028,6 +2129,7 @@ $('#routinePick').addEventListener('change', e => {
   // 記録済みのセットが1つでもあれば消さずに追加する（別メニューを足した日のため）。
   const swap = !loggedSets(sess) && sess.entries.length > 0;
   if (swap) sess.entries = [];
+  sess.routine = r.name;          // 履歴でA日/B日が分かるように残す
   let added = 0;
   for (const exId of r.exIds) {
     if (!exById(exId)) continue;
@@ -2122,7 +2224,7 @@ function renderHist() {
     const memo = s.memo ? '<div class="memoline" style="margin:6px 0 0">' + esc(s.memo) + '</div>' : '';
     return '<div>' +
       '<div class="list-item" data-date="' + s.date + '">' +
-        '<div class="t"><b>' + dateLabel(s.date) + (s.memo ? ' 📝' : '') + '</b><span>' + cs + ' ／ ' +
+        '<div class="t"><b>' + dateLabel(s.date) + (s.memo ? ' 📝' : '') + routineBadge(s) + '</b><span>' + cs + ' ／ ' +
           loggedSets(s) + 'セット ／ ' + fmt(sessionVolume(s)) + ' kg</span></div>' +
         '<button class="btn sm ghost" data-act="open">編集</button>' +
         '<button class="btn sm danger" data-act="del">削除</button>' +
