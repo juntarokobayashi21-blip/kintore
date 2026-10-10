@@ -2023,6 +2023,11 @@ $('#routinePick').addEventListener('change', e => {
   e.target.value = '';
   if (!r) return;
   const sess = getSession(curDate, true);
+  // まだ1セットも入力していない日は、前に選んだルーティンを置き換える。
+  // 選び直すたびに種目が積み上がって、手で消す羽目になるのを防ぐ。
+  // 記録済みのセットが1つでもあれば消さずに追加する（別メニューを足した日のため）。
+  const swap = !loggedSets(sess) && sess.entries.length > 0;
+  if (swap) sess.entries = [];
   let added = 0;
   for (const exId of r.exIds) {
     if (!exById(exId)) continue;
@@ -2032,9 +2037,10 @@ $('#routinePick').addEventListener('change', e => {
     sess.entries.push({ exId, sets: Array.from({ length: n }, () => ({ w: '', r: '' })) });
     added++;
   }
-  if (!sess.entries.length) dropSession(sess.date);
+  if (!sess.entries.length && !sess.memo) dropSession(sess.date);
   saveDay(); renderLog();
-  toast(added ? r.name + ' を読み込みました' : '追加する種目がありませんでした');
+  toast(added ? r.name + (swap ? ' に切り替えました' : ' を読み込みました')
+    : '追加する種目がありませんでした');
 });
 
 let rtEditing = null;
